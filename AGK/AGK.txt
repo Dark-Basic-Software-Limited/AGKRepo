@@ -1,15 +1,24 @@
 AGK Change Log
 ==============
 
-Build Studio 2025.03.18
+Build Studio 2025.06.12
 -----------------------
 
-- Added 'Bytecode Hash Interpreter.pdf' featuring helpful tutorial on working with bytecode file
-
-Build Studio 2024.12.18
------------------------
-
-- Reinstate API34 to resolve compatibility issues with existing AGK Projects
+- Update Google Billing to 7.1.1
+- Update IAP code to comply with Google Billing 7.1.1
+- Target API 35
+- Update Gradle to v8.14
+- Update AGP to 8.9.2
+- Update Tier 2 templates
+- Add missing Examples media
+- Add missing Sandbox media
+- Add missing Example Plugins
+- Minimum Android Version now 21 (was 16)
+- Updated Example Plugins VS solutions to 2022
+- Changed copyright to DarkBasicSoftwareLimited
+- Change command examples to use local versions
+- Update XInput1_3.dll to XInput9_1_0.dll
+- Add Bonus Tutorials DLC
 
 Build Studio 2024.07.07
 -----------------------

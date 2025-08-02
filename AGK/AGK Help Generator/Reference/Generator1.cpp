@@ -374,10 +374,15 @@ const char* szLine1 = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"htt
 const char* szLine2 = " - AGK Help</title>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n<script type=\"text/javascript\" src=\"";
 const char* szLine3 = "main.js\"></script>\n<script type=\"text/javascript\">var commandName = \"";
 const char* szLine3b = "\";</script>\n<link href=\"";
-const char* szLine4 = "main.css\" rel=\"styleSheet\" type=\"text/css\" /><script type=\"text/javascript\">window.addEventListener(\"message\", receiveMessage, false);function receiveMessage(event){if( event.origin !== 'http://www.appgamekit.com' && event.origin !== 'https://www.appgamekit.com' && event.origin !== 'http://appgamekit.com' && event.origin !== 'https://appgamekit.com' && event.origin !== 'http://agk.thegamecreators.com' && event.origin !== 'https://agk.thegamecreators.com' ) return;document.getElementById('comments').style.height = (parseInt(event.data))+'px'; document.getElementById('comments').scrolling='no';}</script>\n";
-const char* szLine4a = "<script type=\"text/javascript\" src=\"https://www.appgamekit.com/assets/js/docs-jquery.min.js\"></script>";
-const char* szLine4b = "<script type=\"text/javascript\" src=\"https://www.appgamekit.com/assets/js/docs-translate.js\"></script>";
-const char* szLine4c = "</head>\n<body>\n";
+const char* szLine4 = "main.css\" rel=\"styleSheet\" type=\"text/css\" /><script type=\"text/javascript\">const validServerOrigins = [ 'http://www.appgamekit.com', 'http://www.appgamekit.com', 'https://www.appgamekit.com', 'http://appgamekit.com', 'https://appgamekit.com', 'http://agk.thegamecreators.com', 'https://agk.thegamecreators.com' ];  const isAgkServer = validServerOrigins.includes(window.origin);  function createIframe() { if(document.getElementById('div-comments') === null) return; const iframe = document.createElement('iframe');  iframe.id = \"comments\"; iframe.style = \"width:700px;margin:0px auto;border:none\"; iframe.src = isAgkServer ? \"https://www.appgamekit.com/help/comments?command=";
+const char* szLine4a = "\" : \"";
+const char* szLine4b = "command_examples/tier1/";
+const char* szLine4c = ".htm\";  document.getElementById('div-comments').appendChild(iframe); } document.addEventListener(\"DOMContentLoaded\", (event) => {createIframe();}); function initTranslate() { const loadScript = (src) => { return new Promise((resolve, reject) => { const script = document.createElement('script'); script.type = 'text/javascript'; script.src = src; script.onload = () => resolve(src); script.onerror = () => reject(new Error(`Failed to load script: ${src}`)); document.head.appendChild(script); }); };  const queryScript = isAgkServer ? 'https://www.appgamekit.com/assets/js/docs-jquery.min.js' : '";
+const char* szLine4d = "docs-jquery.min.js'; const translateScript = isAgkServer ? 'https://www.appgamekit.com/assets/js/docs-translate.js' : '";
+const char* szLine4e = "docs-translate.js';  loadScript(queryScript).then(() => loadScript(translateScript)).catch(error => console.error(error)); }  try { initTranslate(); } catch(e) { console.warn('initTranslate failed: ' + e); } window.addEventListener(\"message\", receiveMessage, false);function receiveMessage(event){if( (event.origin !== 'null' && !validServerOrigins.includes(event.origin)) || event.source.top !== window.self ) return;document.getElementById('comments').style.height = (parseInt(event.data))+'px'; document.getElementById('comments').scrolling='no';}</script>\n";
+//const char* szLine4a = "<script type=\"text/javascript\" src=\"https://www.appgamekit.com/assets/js/docs-jquery.min.js\"></script>"; //remove dependency 
+//const char* szLine4b = "<script type=\"text/javascript\" src=\"https://www.appgamekit.com/assets/js/docs-translate.js\"></script>"; //unused
+const char* szLine4f = "</head>\n<body>\n";
 const char* szLine5 = "<div class=\"header\" style=\"background: #000 url('";
 const char* szLine6 = "gfx/header-back.png') top center no-repeat;\"><div><div class=\"navigation\"><a href=\"";
 const char* szLine7 = "home.html\"><img src=\"";
@@ -397,8 +402,8 @@ const char* szLine19 = "</div><div class=\"page\">";
 
 // footer
 const char* szLine20 = "<br><br>";
-const char* szLine20b = "<div style=\"height:2px;width:100%;border-bottom:1px solid #b0b0b0;margin:0px auto 10px auto;padding:0px;\"> </div><iframe id=\"comments\" style=\"width:700px;margin:0px auto;border:none\" src=\"https://www.appgamekit.com/help/comments?command=";
-const char* szLine20c = "\"></iframe>";
+const char* szLine20b = "<div style=\"height:2px;width:100%;border-bottom:1px solid #b0b0b0;margin:0px auto 10px auto;padding:0px;\"> </div><div id=\"div-comments\"><noscript><iframe id=\"comments\" style=\"width:700px;margin:0px auto;border:none\" src=\"https://www.appgamekit.com/help/comments?command=";
+const char* szLine20c = "\"></iframe></noscript></div>";
 const char* szLine20d = "</div><div class=\"footer\" style=\"background: #000 url('";
 const char* szLine21 = "gfx/footer-back.png') top center no-repeat;\"><div><p><a href=\"https://www.thegamecreators.com\" target=\"_blank\" style=\"float:none\"><img style=\"float:right;margin-top:2px\" src=\"";
 const char* szLine22 = "gfx/tgc-logo.png\" width=\"188\" height=\"27\" alt=\"\" border=\"0\"></a><br><strong>App Game Kit</strong> &nbsp;&copy; The Game Creators Ltd. All Rights Reserved.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href=\"mailto:agkreports@thegamecreators.com\" style=\"float:none\"><font color=\"FFFFFF\">Report an issue</font></a></p></p></div></div>";
@@ -418,9 +423,17 @@ void WriteHTMLHeader( FILE* fp, const char* szTitle, const char* szBreadCrumb, c
 	fwrite ( szPathToHome, strlen(szPathToHome), 1, fp );
 
 	fwrite ( szLine4, strlen(szLine4), 1, fp );
-	fwrite ( szLine4a, strlen(szLine4a), 1, fp );
+	fwrite ( szTitle, strlen(szTitle), 1, fp);
+	fwrite ( szLine4a, strlen(szLine4a), 1, fp);
+	fwrite ( szPathToHome, strlen(szPathToHome), 1, fp);
 	fwrite ( szLine4b, strlen(szLine4b), 1, fp );
-	fwrite ( szLine4c, strlen(szLine4c), 1, fp );
+	fwrite ( szTitle, strlen(szTitle), 1, fp);
+	fwrite ( szLine4c, strlen(szLine4c), 1, fp);
+	fwrite ( szPathToHome, strlen(szPathToHome), 1, fp);
+	fwrite ( szLine4d, strlen(szLine4d), 1, fp);
+	fwrite ( szPathToHome, strlen(szPathToHome), 1, fp);
+	fwrite ( szLine4e, strlen(szLine4e), 1, fp);
+	fwrite ( szLine4f, strlen(szLine4f), 1, fp );
 
 	fwrite ( szLine5, strlen(szLine5), 1, fp );
 	fwrite ( szPathToHome, strlen(szPathToHome), 1, fp );

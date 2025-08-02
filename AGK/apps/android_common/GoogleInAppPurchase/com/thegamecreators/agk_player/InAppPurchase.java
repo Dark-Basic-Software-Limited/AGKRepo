@@ -22,6 +22,11 @@ import com.android.billingclient.api.PurchasesUpdatedListener;
 import com.android.billingclient.api.QueryProductDetailsParams;
 import com.android.billingclient.api.QueryPurchasesParams;
 
+//added by dw for 7.1.1
+import com.android.billingclient.api.ProductDetails.OneTimePurchaseOfferDetails;
+import com.android.billingclient.api.ProductDetails.PricingPhases;
+import com.android.billingclient.api.ProductDetails.SubscriptionOfferDetails;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,7 +48,7 @@ public class InAppPurchase
     {
         INITIAL_STATE,
         IN_PROGRESS,
-        FINSIHED,
+        FINISHED,
         FAILED
     }
 
@@ -51,7 +56,6 @@ public class InAppPurchase
     {
         String name = "";
         int type = 0; // 0=non-consumable, 1=consumable, 2=subscription
-        int isRenewing = -1;
         IAPProductState state = IAPProductState.NOT_PURCHASED;
         String lastSignature = "";
         String lastToken = "";
@@ -112,7 +116,7 @@ public class InAppPurchase
                 g_iapCallbackCount++;
                 if ( g_iapCallbackCount >= 2 )
                 {
-                    g_iIAPStatus = IAPSetupState.FINSIHED;
+                    g_iIAPStatus = IAPSetupState.FINISHED;
                     iapRestore();
                 }
             }
@@ -174,11 +178,7 @@ public class InAppPurchase
             {
                 int prodType = product.type;
                 if ( prodType == 1 ) prodType = 0;
-                if ( prodType == type )
-                {
-                    product.state = IAPProductState.NOT_PURCHASED;
-                    product.isRenewing = -1;
-                }
+                if ( prodType == type ) product.state = IAPProductState.NOT_PURCHASED;
             }
 
             for (Purchase purchase : list)
@@ -202,10 +202,6 @@ public class InAppPurchase
                                     product.lastSignature = purchase.getSignature();
                                     product.lastToken = purchase.getPurchaseToken();
                                     product.state = IAPProductState.PURCHASED;
-                                    if ( type == 2 )
-                                    {
-                                        product.isRenewing = purchase.isAutoRenewing() ? 1 : 0;
-                                    }
                                 }
 
                                 // is it consumable? This should be phased out in favour of iapResetPurchase
@@ -309,56 +305,57 @@ public class InAppPurchase
 
     private static void refreshProducts()
     {
-        ArrayList<QueryProductDetailsParams.Product> products = new ArrayList<QueryProductDetailsParams.Product>();
-        ArrayList<QueryProductDetailsParams.Product> subscriptions = new ArrayList<QueryProductDetailsParams.Product>();
+        ArrayList<QueryProductDetailsParams.Product> products = new ArrayList<>();
+        ArrayList<QueryProductDetailsParams.Product> subscriptions = new ArrayList<>();
 
-        for( IAPProduct product : g_pIAPProducts )
+        for (IAPProduct product : g_pIAPProducts)
         {
-            QueryProductDetailsParams.Product.Builder newProduct = QueryProductDetailsParams.Product.newBuilder();
-            newProduct.setProductId( product.name );
+            QueryProductDetailsParams.Product.Builder newProduct = QueryProductDetailsParams.Product.newBuilder()
+            .setProductId(product.name);
 
-            if ( product.type == 2 )
+            if (product.type == 2) // ideally use a constant instead of 2
             {
-                newProduct.setProductType( BillingClient.ProductType.SUBS );
-                subscriptions.add( newProduct.build() );
+                newProduct.setProductType(BillingClient.ProductType.SUBS);
+                subscriptions.add(newProduct.build());
             }
             else
             {
-                newProduct.setProductType( BillingClient.ProductType.INAPP );
-                products.add( newProduct.build() );
+                newProduct.setProductType(BillingClient.ProductType.INAPP);
+                products.add(newProduct.build());
             }
         }
 
         synchronized (iapLock)
         {
             g_iapCallbackCount = 0;
-            if ( products.size() == 0 ) g_iapCallbackCount++;
-            if ( subscriptions.size() == 0 ) g_iapCallbackCount++;
+            if (!products.isEmpty()) g_iapCallbackCount++;
+            if (!subscriptions.isEmpty()) g_iapCallbackCount++;
         }
 
-        if ( products.size() > 0 )
+        if (!products.isEmpty())
         {
-            // query products
-            QueryProductDetailsParams.Builder params = QueryProductDetailsParams.newBuilder();
-            params.setProductList( products );
-            billingClient.queryProductDetailsAsync( params.build(), billingProductListener );
+            QueryProductDetailsParams params = QueryProductDetailsParams.newBuilder()
+            .setProductList(products)
+            .build();
+            billingClient.queryProductDetailsAsync(params, billingProductListener);
         }
 
-        if ( subscriptions.size() > 0 )
+        if (!subscriptions.isEmpty())
         {
-            // query subscriptions
-            QueryProductDetailsParams.Builder params = QueryProductDetailsParams.newBuilder();
-            params.setProductList( subscriptions );
-            billingClient.queryProductDetailsAsync( params.build(), billingProductListener );
+            QueryProductDetailsParams params = QueryProductDetailsParams.newBuilder()
+            .setProductList(subscriptions)
+            .build();
+            billingClient.queryProductDetailsAsync(params, billingProductListener);
         }
     }
+    
 
     public static void iapSetup( Activity act )
     {
         switch( g_iIAPStatus )
         {
             case IN_PROGRESS: AGKHelper.ShowMessage( act, "Cannot set up IAP, setup is already in progress" ); return;
-            case FINSIHED: AGKHelper.ShowMessage(act, "Failed to call InAppPurchaseSetup(), setup has already been completed"); return;
+            case FINISHED: AGKHelper.ShowMessage(act, "Failed to call InAppPurchaseSetup(), setup has already been completed"); return;
         }
 
         g_iIAPStatus = IAPSetupState.IN_PROGRESS;
@@ -408,7 +405,7 @@ public class InAppPurchase
     public static void iapRestore()
     {
         if ( billingClient == null ) return;
-        if ( g_iIAPStatus != IAPSetupState.FINSIHED ) return;
+        if ( g_iIAPStatus != IAPSetupState.FINISHED ) return;
 
         if ( billingClient.isReady() )
         {
@@ -447,11 +444,32 @@ public class InAppPurchase
             {
                 // only process queued products
                 if (product.state != IAPProductState.QUEUED) continue;
+                
+                // Check for missing product details before using it
+                if (product.details == null) {
+                    Log.e("IAP", "Product details not set for: " + product.name);
+                    continue;
+                }
+                
                 product.state = IAPProductState.IN_PROGRESS;
 
                 BillingFlowParams.ProductDetailsParams.Builder newProduct = BillingFlowParams.ProductDetailsParams.newBuilder();
+                
+                
                 newProduct.setProductDetails(product.details);
+
+                //this stopped the crashes dw
+                if ((product.planToken == null || product.planToken.isEmpty()) && product.details.getSubscriptionOfferDetails() != null) {
+                    List<ProductDetails.SubscriptionOfferDetails> offerDetailsList = product.details.getSubscriptionOfferDetails();
+                if (!offerDetailsList.isEmpty()) {
+                     product.planToken = offerDetailsList.get(0).getOfferToken();
+                    }
+                }
+                
+                if (product.planToken != null && !product.planToken.isEmpty()) {
                 newProduct.setOfferToken(product.planToken);
+                }
+
                 product.planToken = "";
 
                 BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
@@ -493,7 +511,7 @@ public class InAppPurchase
             }
         }
 
-        if ( g_iIAPStatus != IAPSetupState.FINSIHED )
+        if ( g_iIAPStatus != IAPSetupState.FINISHED )
         {
             switch( g_iIAPStatus )
             {
@@ -512,14 +530,24 @@ public class InAppPurchase
                 return;
             }
 
+            // Warn if a subscription is being started without an offer token
+            if (product.details.getProductType().equals(BillingClient.ProductType.SUBS) &&
+            (planToken == null || planToken.isEmpty())) {
+            Log.w("IAP", "Starting subscription purchase without plan token for: " + product.name);
+            }
+
             product.state = IAPProductState.QUEUED; // queued
             product.lastSignature = "";
             product.lastToken = "";
             product.planToken = planToken;
         }
         String planText = "";
-        if ( !planToken.equals("") ) planToken = " with plan " + planToken.substring(0, 20) + "...";
+
+        if (!planToken.equals("")) planText = " with plan " + planToken.substring(0, Math.min(20, planToken.length())) + "...";
         Log.i("IAP", "Starting purchase for " + product.name + planText );
+
+       // if ( !planToken.equals("") ) planToken = " with plan " + planToken.substring(0, 20) + "...";
+       // Log.i("IAP", "Starting purchase for " + product.name + planText );
 
         if ( billingClient.isReady() )
         {
@@ -563,10 +591,17 @@ public class InAppPurchase
 
                 ConsumeParams params = ConsumeParams.newBuilder().setPurchaseToken(token).build();
                 billingClient.consumeAsync(params, new ConsumeResponseListener() {
-                    @Override
-                    public void onConsumeResponse(@NonNull BillingResult billingResult, @NonNull String s) {
-                        Log.d("IAP", "Consumption finished: " + billingResult.getDebugMessage());
-                    }
+                  
+                @Override
+                public void onConsumeResponse(@NonNull BillingResult billingResult, @NonNull String s) {
+                    if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
+                         Log.d("IAP", "Product consumed successfully: " + s);
+                    } else {
+                         Log.e("IAP", "Failed to consume product: " + billingResult.getResponseCode() + ", " + billingResult.getDebugMessage());
+                     }
+                    
+                }
+                    
                 });
                 synchronized (iapLock)
                 {
@@ -582,8 +617,16 @@ public class InAppPurchase
 
     public static void iapResetPurchase( String token )
     {
-        if ( billingClient == null ) return;
-        if ( g_iIAPStatus != IAPSetupState.FINSIHED ) return;
+        
+         //Add these checks at the start
+        if (billingClient == null) {
+        Log.w("IAP", "Cannot reset purchase: billingClient is null");
+        return;
+        }
+        if (g_iIAPStatus != IAPSetupState.FINISHED) {
+        Log.w("IAP", "Cannot reset purchase: IAP setup not finished");
+        return;
+         }
 
         if ( billingClient.isReady() )
         {
@@ -648,19 +691,30 @@ public class InAppPurchase
     {
         synchronized (iapLock)
         {
-            if ( ID < 0 || ID >= g_pIAPProducts.size() ) return "";
-            IAPProduct product = g_pIAPProducts.get( ID );
-            if ( product.details == null ) return "";
-            if ( product.details.getProductType().equals( BillingClient.ProductType.INAPP ) ) {
-                return product.details.getOneTimePurchaseOfferDetails().getFormattedPrice();
+            if (ID < 0 || ID >= g_pIAPProducts.size()) return "";
+            IAPProduct product = g_pIAPProducts.get(ID);
+            if (product.details == null) return "";
+
+            if (product.details.getProductType().equals(BillingClient.ProductType.INAPP)) {
+            OneTimePurchaseOfferDetails oneTimeDetails = product.details.getOneTimePurchaseOfferDetails();
+            if (oneTimeDetails != null) {
+                return oneTimeDetails.getFormattedPrice();
+            } else {
+                return "";
             }
-            else
-            {
-                // this may not be the right price, but don't know which one to return for subscriptions
-                // use iapGetPlanPrice instead
-                return product.details.getSubscriptionOfferDetails().get(0).getPricingPhases().getPricingPhaseList().get(0).getFormattedPrice();
+            } else if (product.details.getProductType().equals(BillingClient.ProductType.SUBS)) {
+            List<SubscriptionOfferDetails> offerDetails = product.details.getSubscriptionOfferDetails();
+            if (offerDetails != null && !offerDetails.isEmpty()) {
+                PricingPhases phases = offerDetails.get(0).getPricingPhases();
+                if (phases != null && !phases.getPricingPhaseList().isEmpty()) {
+                    return phases.getPricingPhaseList().get(0).getFormattedPrice();
+                }
             }
-        }
+                return "";
+            } else {
+                return "";
+            }
+         }
     }
 
     public static String iapGetDescription( int ID )
@@ -698,153 +752,159 @@ public class InAppPurchase
     {
         synchronized (iapLock)
         {
-            if ( ID < 0 || ID >= g_pIAPProducts.size() ) return 0;
-            IAPProduct product = g_pIAPProducts.get( ID );
-            if ( product.details == null ) return 0;
-            if ( !product.details.getProductType().equals( BillingClient.ProductType.SUBS ) ) return 0;
+             if (ID < 0 || ID >= g_pIAPProducts.size()) return 0;
+            IAPProduct product = g_pIAPProducts.get(ID);
+            if (product.details == null) return 0;
+            if (!product.details.getProductType().equals(BillingClient.ProductType.SUBS)) return 0;
 
-            return product.details.getSubscriptionOfferDetails().size();
+            List<SubscriptionOfferDetails> offers = product.details.getSubscriptionOfferDetails();
+            return (offers != null) ? offers.size() : 0;
         }
     }
 
-    public static int iapGetPlanNumPeriods( int ID, int planIndex )
+    public static int iapGetPlanNumPeriods(int ID, int planIndex) 
     {
         synchronized (iapLock)
         {
-            if ( ID < 0 || ID >= g_pIAPProducts.size() ) return 0;
-            IAPProduct product = g_pIAPProducts.get( ID );
-            if ( product.details == null ) return 0;
-            if ( !product.details.getProductType().equals( BillingClient.ProductType.SUBS ) ) return 0;
+             if (ID < 0 || ID >= g_pIAPProducts.size()) return 0;
+            IAPProduct product = g_pIAPProducts.get(ID);
+            if (product.details == null) return 0;
+            if (!product.details.getProductType().equals(BillingClient.ProductType.SUBS)) return 0;
 
-            int numPlans = product.details.getSubscriptionOfferDetails().size();
-            if ( planIndex < 0 || planIndex >= numPlans ) return 0;
+            List<SubscriptionOfferDetails> offers = product.details.getSubscriptionOfferDetails();
+            if (offers == null || planIndex < 0 || planIndex >= offers.size()) return 0;
 
-            return product.details.getSubscriptionOfferDetails().get( planIndex ).getPricingPhases().getPricingPhaseList().size();
+            PricingPhases phases = offers.get(planIndex).getPricingPhases();
+            if (phases == null || phases.getPricingPhaseList() == null) return 0;
+
+            return phases.getPricingPhaseList().size();
         }
     }
 
-    public static String iapGetPlanPrice( int ID, int planIndex, int periodIndex )
+    public static String iapGetPlanPrice(int ID, int planIndex, int periodIndex) 
     {
         synchronized (iapLock)
         {
-            if ( ID < 0 || ID >= g_pIAPProducts.size() ) return "Error";
-            IAPProduct product = g_pIAPProducts.get( ID );
-            if ( product.details == null ) return "";
-            if ( !product.details.getProductType().equals( BillingClient.ProductType.SUBS ) ) return "Error";
+            if (ID < 0 || ID >= g_pIAPProducts.size()) return "Error";
+            IAPProduct product = g_pIAPProducts.get(ID);
+            if (product.details == null) return "";
+            if (!product.details.getProductType().equals(BillingClient.ProductType.SUBS)) return "Error";
 
-            int numPlans = product.details.getSubscriptionOfferDetails().size();
-            if ( planIndex < 0 || planIndex >= numPlans ) return "Error";
+            List<SubscriptionOfferDetails> offers = product.details.getSubscriptionOfferDetails();
+            if (offers == null || planIndex < 0 || planIndex >= offers.size()) return "Error";
 
-            List<ProductDetails.PricingPhase> planPeriods = product.details.getSubscriptionOfferDetails().get( planIndex ).getPricingPhases().getPricingPhaseList();
-            if ( periodIndex < 0 || periodIndex >= planPeriods.size() ) return "Error";
-            return planPeriods.get( periodIndex ).getFormattedPrice();
+            PricingPhases phases = offers.get(planIndex).getPricingPhases();
+            if (phases == null || phases.getPricingPhaseList() == null) return "Error";
+
+            List<ProductDetails.PricingPhase> planPeriods = phases.getPricingPhaseList();
+            if (periodIndex < 0 || periodIndex >= planPeriods.size()) return "Error";
+
+            return planPeriods.get(periodIndex).getFormattedPrice();
         }
     }
 
-    public static int iapGetPlanDuration( int ID, int planIndex, int periodIndex )
+    public static int iapGetPlanDuration(int ID, int planIndex, int periodIndex) 
+    {   
+        synchronized (iapLock)
+        {
+            if (ID < 0 || ID >= g_pIAPProducts.size()) return 0;
+            IAPProduct product = g_pIAPProducts.get(ID);
+            if (product.details == null) return 0;
+            if (!product.details.getProductType().equals(BillingClient.ProductType.SUBS)) return 0;
+
+            List<SubscriptionOfferDetails> offers = product.details.getSubscriptionOfferDetails();
+            if (offers == null || planIndex < 0 || planIndex >= offers.size()) return 0;
+
+            PricingPhases phases = offers.get(planIndex).getPricingPhases();
+            if (phases == null || phases.getPricingPhaseList() == null) return 0;
+
+            List<ProductDetails.PricingPhase> planPeriods = phases.getPricingPhaseList();
+            if (periodIndex < 0 || periodIndex >= planPeriods.size()) return 0;
+
+            int count = planPeriods.get(periodIndex).getBillingCycleCount();
+            return (count == 0) ? 1 : count;
+        }
+    }
+   
+    public static String iapGetPlanDurationUnit(int ID, int planIndex, int periodIndex) 
     {
         synchronized (iapLock)
         {
-            if ( ID < 0 || ID >= g_pIAPProducts.size() ) return 0;
-            IAPProduct product = g_pIAPProducts.get( ID );
-            if ( product.details == null ) return 0;
-            if ( !product.details.getProductType().equals( BillingClient.ProductType.SUBS ) ) return 0;
+            if (ID < 0 || ID >= g_pIAPProducts.size()) return "";
+            IAPProduct product = g_pIAPProducts.get(ID);
+            if (product.details == null) return "";
+            if (!BillingClient.ProductType.SUBS.equals(product.details.getProductType())) return "";
 
-            int numPlans = product.details.getSubscriptionOfferDetails().size();
-            if ( planIndex < 0 || planIndex >= numPlans ) return 0;
+            List<SubscriptionOfferDetails> offerDetails = product.details.getSubscriptionOfferDetails();
+            if (offerDetails == null || planIndex < 0 || planIndex >= offerDetails.size()) return "";
 
-            List<ProductDetails.PricingPhase> planPeriods = product.details.getSubscriptionOfferDetails().get( planIndex ).getPricingPhases().getPricingPhaseList();
-            if ( periodIndex < 0 || periodIndex >= planPeriods.size() ) return 0;
-            int count = planPeriods.get( periodIndex ).getBillingCycleCount();
-            if ( count == 0 ) count = 1;
+            PricingPhases phases = offerDetails.get(planIndex).getPricingPhases();
+            if (phases == null) return "";
 
-            return count;
+            List<ProductDetails.PricingPhase> planPeriods = phases.getPricingPhaseList();
+            if (planPeriods == null || periodIndex < 0 || periodIndex >= planPeriods.size()) return "";
+
+            String billingPeriod = planPeriods.get(periodIndex).getBillingPeriod();
+            if (billingPeriod == null || billingPeriod.isEmpty()) return "";
+
+            // Return the raw ISO 8601 string (e.g., P1M, P1Y)
+            return billingPeriod;
         }
     }
 
-    public static String iapGetPlanDurationUnit( int ID, int planIndex, int periodIndex )
+    public static int iapGetPlanPaymentType(int ID, int planIndex, int periodIndex) 
     {
         synchronized (iapLock)
         {
-            if ( ID < 0 || ID >= g_pIAPProducts.size() ) return "";
-            IAPProduct product = g_pIAPProducts.get( ID );
-            if ( product.details == null ) return "";
-            if ( !product.details.getProductType().equals( BillingClient.ProductType.SUBS ) ) return "";
+            if (ID < 0 || ID >= g_pIAPProducts.size()) return 0;
+            IAPProduct product = g_pIAPProducts.get(ID);
+            if (product.details == null) return 0;
+            if (!product.details.getProductType().equals(BillingClient.ProductType.SUBS)) return 0;
 
-            int numPlans = product.details.getSubscriptionOfferDetails().size();
-            if ( planIndex < 0 || planIndex >= numPlans ) return "";
+            List<SubscriptionOfferDetails> offerDetails = product.details.getSubscriptionOfferDetails();
+            if (offerDetails == null || planIndex < 0 || planIndex >= offerDetails.size()) return 0;
 
-            List<ProductDetails.PricingPhase> planPeriods = product.details.getSubscriptionOfferDetails().get( planIndex ).getPricingPhases().getPricingPhaseList();
-            if ( periodIndex < 0 || periodIndex >= planPeriods.size() ) return "";
+            List<ProductDetails.PricingPhase> planPeriods = offerDetails.get(planIndex).getPricingPhases().getPricingPhaseList();
+            if (planPeriods == null || periodIndex < 0 || periodIndex >= planPeriods.size()) return 0;
 
-            String unit = planPeriods.get( periodIndex ).getBillingPeriod();
-            if ( unit.charAt(0) == 'P' ) unit = unit.substring( 1 );
-            StringBuilder num = new StringBuilder( unit.length() );
-            for( int i = 0; i < unit.length(); i++ )
-            {
-                char c = unit.charAt( i );
-                if ( c < 48 || c > 57 ) break;
-                num.append( c );
-            }
-            StringBuilder output = new StringBuilder();
-            output.append( unit.charAt( unit.length()-1 ) );
-            output.append( num );
-            return output.toString();
-        }
-    }
+            ProductDetails.PricingPhase period = planPeriods.get(periodIndex);
+            if (period.getPriceAmountMicros() == 0) return 0;
 
-    public static int iapGetPlanPaymentType( int ID, int planIndex, int periodIndex )
-    {
-        synchronized (iapLock)
-        {
-            if ( ID < 0 || ID >= g_pIAPProducts.size() ) return 0;
-            IAPProduct product = g_pIAPProducts.get( ID );
-            if ( product.details == null ) return 0;
-            if ( !product.details.getProductType().equals( BillingClient.ProductType.SUBS ) ) return 0;
-
-            int numPlans = product.details.getSubscriptionOfferDetails().size();
-            if ( planIndex < 0 || planIndex >= numPlans ) return 0;
-
-            List<ProductDetails.PricingPhase> planPeriods = product.details.getSubscriptionOfferDetails().get( planIndex ).getPricingPhases().getPricingPhaseList();
-            if ( periodIndex < 0 || periodIndex >= planPeriods.size() ) return 0;
-            ProductDetails.PricingPhase period = planPeriods.get( periodIndex );
-            if ( period.getFormattedPrice().equalsIgnoreCase("Free") ) return 0;
-
-            switch( period.getRecurrenceMode() )
+            switch (period.getRecurrenceMode())
             {
                 case ProductDetails.RecurrenceMode.NON_RECURRING: return 1;
                 case ProductDetails.RecurrenceMode.FINITE_RECURRING: return 2;
                 case ProductDetails.RecurrenceMode.INFINITE_RECURRING: return 3;
+                default: return -1;
             }
-
-            return -1;
         }
     }
-
-    public static String iapGetPlanTags( int ID, int planIndex )
+    
+    public static String iapGetPlanTags(int ID, int planIndex) 
     {
         synchronized (iapLock)
         {
-            if ( ID < 0 || ID >= g_pIAPProducts.size() ) return "";
-            IAPProduct product = g_pIAPProducts.get( ID );
-            if ( product.details == null ) return "";
-            if ( !product.details.getProductType().equals( BillingClient.ProductType.SUBS ) ) return "";
+            if (ID < 0 || ID >= g_pIAPProducts.size()) return "";
+            IAPProduct product = g_pIAPProducts.get(ID);
+            if (product.details == null) return "";
+            if (!product.details.getProductType().equals(BillingClient.ProductType.SUBS)) return "";
 
-            int numPlans = product.details.getSubscriptionOfferDetails().size();
-            if ( planIndex < 0 || planIndex >= numPlans ) return "";
+            List<ProductDetails.SubscriptionOfferDetails> offerDetails = product.details.getSubscriptionOfferDetails();
+            if (offerDetails == null || planIndex < 0 || planIndex >= offerDetails.size()) return "";
 
-            ProductDetails.SubscriptionOfferDetails plan = product.details.getSubscriptionOfferDetails().get( planIndex );
-            if ( plan.getOfferTags().size() == 0 ) return "";
+            List<String> tags = offerDetails.get(planIndex).getOfferTags();
+            if (tags == null || tags.isEmpty()) return "";
 
-            String tags = "";
-            for( String tag : plan.getOfferTags() )
-            {
-                tags += ";" + tag;
+            StringBuilder builder = new StringBuilder();
+            for (String tag : tags) {
+                if (builder.length() > 0) builder.append(";");
+                builder.append(tag);
             }
 
-            return tags.substring( 1 );
+            return builder.toString();
         }
     }
+    
 
     public static String iapGetPlanToken( int ID, int planIndex )
     {

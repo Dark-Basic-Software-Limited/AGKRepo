@@ -6,7 +6,7 @@ Please read before installing or otherwise using AppGameKit Studio
 
 By installing the software (the 'Software') on any computer, or otherwise using the Software, you agree that any use of the Software is subject to the terms of this End User Licence Agreement (this 'Agreement'). If you do not agree to these terms please do not install or otherwise use the Software and return the Software unused in its packaging, together with all of its documentation, to the place of purchase for a refund.
 
-The copyright in the Software and its associated documentation is owned by The Game Creators Limited "the Owner".  All Rights Reserved.  By installing or otherwise using the Software, you (an individual or legal entity) agree with the Owner to be bound by the terms of this Agreement which will govern your use of the Software and your limited right to exploit a part of the Software.
+The copyright in the Software and its associated documentation is owned by Dark Basic Software Limited "the Owner".  All Rights Reserved.  By installing or otherwise using the Software, you (an individual or legal entity) agree with the Owner to be bound by the terms of this Agreement which will govern your use of the Software and your limited right to exploit a part of the Software.
 
 1. Licence
 

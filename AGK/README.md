@@ -4,7 +4,7 @@ A community collaboration repository for AppGameKit Tier 2
 
 ## Introduction
 
-AppGameKit is feature packed with over 1,900 commands! Even after all these years we still get asked to add a myriad of new features. For this reason, weâ€™re creating this community GitHub repository to encourage the more experienced developers within the community to help extend the features of AppGameKit.
+AppGameKit is feature packed with over 1,900 commands! Even after all these years we still get asked to add a myriad of new features. For this reason, we’re creating this community GitHub repository to encourage the more experienced developers within the community to help extend the features of AppGameKit.
 
 ## Source Code Access
 
@@ -20,4 +20,4 @@ The best aspect of our repository access is that we can now include other develo
 
 ## Permitted Usage (License)
 
-It is expressly made clear that this is NOT an open source project and all material is copyright Dark Basic Software Limited, and any work submitted to the repository is automatically given over to Dark Basic Software Limited to use for any purpose and all Intellectual Property and copyright transferred over to Dark Basic Software Limited. You may use this repository to help improve AppGameKit Tier2, to work on freelance contracts from Dark Basic Software Limited, and also to compile a new Tier 2 library for your own use under the terms of the AppGameKit EULA, provided that you own a copy of AppGameKit. You may not distribute compiled versions of this code, nor use this code in a product that competes with the AppGameKit product, such as a game maker or app maker. If you have any doubts about the usage rights, you can contact us directly at lee@thegamecreators.com
+It is expressly made clear that this is NOT an open source project and all material is copyright The Game Creators Ltd, and any work submitted to the repository is automatically given over to The Game Creators Ltd to use for any purpose and all Intellectual Property and copyright transferred over to The Game Creators Ltd. You may use this repository to help improve AppGameKit Tier2, to work on freelance contracts from The Game Creators Ltd, and also to compile a new Tier 2 library for your own use under the terms of the AppGameKit EULA, provided that you own a copy of AppGameKit. You may not distribute compiled versions of this code, nor use this code in a product that competes with the AppGameKit product, such as a game maker or app maker. If you have any doubts about the usage rights, you can contact us directly at lee@thegamecreators.com

@@ -3874,9 +3874,11 @@ int app::Loop (void)
 				if (ImGui::MenuItem("AppGameKit Player for Android")) {
 					agk::OpenBrowser("https://play.google.com/store/apps/details?id=com.thegamecreators.agk_player2");
 				}
+				#ifdef AGK_MACOS
 				if (ImGui::MenuItem("AppGameKit Player for IOS")) {
 					agk::OpenBrowser("https://itunes.apple.com/us/app/appgamekit-player/id1071731293?mt=8");
 				}
+				#endif
 
 
 #ifdef TRIALVERSIONEXPIRES

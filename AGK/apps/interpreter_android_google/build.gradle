@@ -2,18 +2,16 @@
 buildscript {
     repositories {
         google()
-        //jcenter()
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.1'
+        classpath 'com.android.tools.build:gradle:8.9.2'
     }
 }
 
 allprojects {
     repositories {
         google()
-        //jcenter()
         mavenCentral()
         maven { url "https://storage.googleapis.com/snap-kit-build/maven" }
         maven { url "https://chartboostmobile.bintray.com/Chartboost" }

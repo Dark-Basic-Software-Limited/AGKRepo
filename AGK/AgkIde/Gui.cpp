@@ -431,7 +431,7 @@ void ProcessPreferences(void) {
 				ImGui::EndTooltip();
 			}
 
-			ImGui::Checkbox("Restore Layout on Startup.", &pref.save_layout);
+			ImGui::Checkbox("Restore Layout on Startup", &pref.save_layout);
 
 			bool bTmp;
 			bTmp = pref.bAppGameKitNews;
@@ -439,7 +439,7 @@ void ProcessPreferences(void) {
 			pref.bAppGameKitNews = bTmp;
 
 			bTmp = pref.iCancelQuitDialog;
-			ImGui::Checkbox("Ask Before Quitting AppGameKit Studio.", &bTmp);
+			ImGui::Checkbox("Ask Before Quitting AppGameKit Studio", &bTmp);
 			pref.iCancelQuitDialog = bTmp;
 
 			ImGui::Text("Toolbar Icon Set:");
@@ -490,7 +490,7 @@ void ProcessPreferences(void) {
 	
 			extern unsigned int os_messages_sleeptime;
 			bool bState = pref.iIDEUpdateEventSleep;
-			ImGui::Checkbox("Event based rendering.", &pref.iIDEUpdateEventSleep);
+			ImGui::Checkbox("Event based rendering", &pref.iIDEUpdateEventSleep);
 
 			if (bState != pref.iIDEUpdateEventSleep) {
 				rb_change = true;
@@ -538,7 +538,7 @@ void ProcessPreferences(void) {
 			ImGui::Text("Build Options:");
 
 			//ImGui::Checkbox("Windows 64-bit", &pref.bWindows64Bit); // now always 64-bit
-			ImGui::Checkbox("Windows Timestamp exe for Faster 'Run'.", &pref.bTimestampExe);
+			ImGui::Checkbox("Windows Timestamp exe for Faster 'Run'", &pref.bTimestampExe);
 			
 			ImGui::Text("");
 			ImGui::Text("Broadcast:");
@@ -560,9 +560,9 @@ void ProcessPreferences(void) {
 			ImGui::Checkbox("Auto Hide Debug Window", &pref.bAutoHideDebugWindows);
 
 //			ImGui::Checkbox("On Debug Start, Bring Debugger to Front", &pref.bDebugBringToFront);
-			ImGui::Checkbox("On Debug Start, Update Watches and Status.", &pref.bDebugBringToFront);
+			ImGui::Checkbox("On Debug Start, Update Watches and Status", &pref.bDebugBringToFront);
 #ifdef AGK_WINDOWS
-			ImGui::Checkbox("On Debug Try to Bring App to Front.", &pref.bDebugBringAppToFront);
+			ImGui::Checkbox("On Debug Try to Bring App to Front", &pref.bDebugBringAppToFront);
 #endif
 
 			//debug_hwnd
@@ -6539,7 +6539,7 @@ void ProcessAndroidExport(void)
 	ImGui::SetWindowFontScale(1.0);
 
 	ImGui::Indent(10.0);
-	ImGui::TextWrapped("This will build an APK from your media and bytecode that will run on any Android device running 4.1 or above. It can also be used to produce an APK suitable for the Google Play, Amazon, or Ouya store if you also provide a keystore file for signing. If you don't yet have a keystore file you can generate one from the Tools menu or in Android Studio.");
+	ImGui::TextWrapped("This will build an APK from your media and bytecode that will run on any Android device running 5.0 or above. It can also be used to produce an APK suitable for the Google Play, Amazon, or Ouya store if you also provide a keystore file for signing. If you don't yet have a keystore file you can generate one from the Tools menu or in Android Studio.");
 
 
 	ImGui::Columns(2, "myAPKexportDialog", false);  // 3-ways, no border
@@ -6700,15 +6700,15 @@ void ProcessAndroidExport(void)
 
 
 	ImGui::Text("Minimum Android Version:");
-	const char* apk_version_array[] = { "4.1 (API 16)", "4.2 (API 17)", "4.3 (API 18)", "4.4 (API 19)", "5.0 (API 21)", "5.1 (API 22)", "6.0 (API 23)"
-		, "7.0 (API 24)", "7.1 (API 25)", "8.0 (API 26)", "8.1 (API 27)", "9.0 (API 28)", "10.0 (API 29)", "11.0 (API 30)", "12.0 (API 31)", "13.0 (API 33)", "14.0 (API 34)" };
+	const char* apk_version_array[] = { "5.0 (API 21)", "5.1 (API 22)", "6.0 (API 23)"
+		, "7.0 (API 24)", "7.1 (API 25)", "8.0 (API 26)", "8.1 (API 27)", "9.0 (API 28)", "10.0 (API 29)", "11.0 (API 30)", "12.0 (API 31)", "13.0 (API 33)", "14.0 (API 34)", "15.0 (API 35)" };
 	ImGui::SameLine();
 	ImGui::SetCursorPos(ImVec2(input_indent, ImGui::GetCursorPos().y));
 	ImGui::Combo("##comboapk_sdk_version", &pCurrentSelectedProject->apk_sdk_version, apk_version_array, IM_ARRAYSIZE(apk_version_array));
 	if (ImGui::IsItemHovered()) {
 		ImGui::SetNextWindowContentSize(ImVec2(400, 0));
 		ImGui::BeginTooltip();
-		ImGui::TextWrapped("For maximum compatibility choose 4.1, if ARCore is required then this must be at least 7.0");
+		ImGui::TextWrapped("For maximum compatibility choose 5.0, if ARCore is required then this must be at least 7.0");
 		ImGui::EndTooltip();
 	}
 
@@ -7131,24 +7131,22 @@ void ProcessAndroidExport(void)
 		char szOrientation[20];
 		sprintf(szOrientation, "%d", orientation);
 
-		int sdk = 16;
-		if (pCurrentSelectedProject->apk_sdk_version == 0) sdk = 16;
-		if (pCurrentSelectedProject->apk_sdk_version == 1) sdk = 17;
-		if (pCurrentSelectedProject->apk_sdk_version == 2) sdk = 18;
-		if (pCurrentSelectedProject->apk_sdk_version == 3) sdk = 19;
-		if (pCurrentSelectedProject->apk_sdk_version == 4) sdk = 21; // 20 deliberately missing
-		if (pCurrentSelectedProject->apk_sdk_version == 5) sdk = 22;
-		if (pCurrentSelectedProject->apk_sdk_version == 6) sdk = 23;
-		if (pCurrentSelectedProject->apk_sdk_version == 7) sdk = 24;
-		if (pCurrentSelectedProject->apk_sdk_version == 8) sdk = 25;
-		if (pCurrentSelectedProject->apk_sdk_version == 9) sdk = 26;
-		if (pCurrentSelectedProject->apk_sdk_version == 10) sdk = 27;
-		if (pCurrentSelectedProject->apk_sdk_version == 11) sdk = 28;
-		if (pCurrentSelectedProject->apk_sdk_version == 12) sdk = 29;
-		if (pCurrentSelectedProject->apk_sdk_version == 13) sdk = 30;
-		if (pCurrentSelectedProject->apk_sdk_version == 14) sdk = 31;
-		if (pCurrentSelectedProject->apk_sdk_version == 15) sdk = 33; // 32 deliberately missing
-		if (pCurrentSelectedProject->apk_sdk_version == 16) sdk = 34;
+		int sdk = 21;
+		if (pCurrentSelectedProject->apk_sdk_version == 0) sdk = 21; // 20 deliberately missing
+		if (pCurrentSelectedProject->apk_sdk_version == 1) sdk = 22;
+		if (pCurrentSelectedProject->apk_sdk_version == 2) sdk = 23;
+		if (pCurrentSelectedProject->apk_sdk_version == 3) sdk = 24;
+		if (pCurrentSelectedProject->apk_sdk_version == 4) sdk = 25;
+		if (pCurrentSelectedProject->apk_sdk_version == 5) sdk = 26;
+		if (pCurrentSelectedProject->apk_sdk_version == 6) sdk = 27;
+		if (pCurrentSelectedProject->apk_sdk_version == 7) sdk = 28;
+		if (pCurrentSelectedProject->apk_sdk_version == 8) sdk = 29;
+		if (pCurrentSelectedProject->apk_sdk_version == 9) sdk = 30;
+		if (pCurrentSelectedProject->apk_sdk_version == 10) sdk = 31;
+		if (pCurrentSelectedProject->apk_sdk_version == 11) sdk = 33; // 32 deliberately missing
+		if (pCurrentSelectedProject->apk_sdk_version == 12) sdk = 34;
+		if (pCurrentSelectedProject->apk_sdk_version == 13) sdk = 35;
+
 		char szSDK[20];
 		sprintf(szSDK, "%d", sdk);
 
@@ -7374,8 +7372,7 @@ void ProcessAndroidExport(void)
 		if (Valid) {
 			char curDir[MAX_PATH];
 			extern char startupFolder[MAX_PATH];
-			//const char* androidJar = "android33.jar";
-			const char* androidJar = "android34.jar";
+			const char* androidJar = "android35.jar";
 
 #if defined(AGK_WINDOWS)
 			_getcwd(&curDir[0], MAX_PATH);
@@ -7758,9 +7755,8 @@ void ProcessAndroidExport(void)
 					strcat(newcontents, szSDK);
 					
 					strcat(newcontents, "\" android:targetSdkVersion=\"");
-					if ( bIsOuya ) strcat(newcontents, "16");
-					//else strcat ( newcontents, "33" );
-					else strcat(newcontents, "34");
+					if ( bIsOuya ) strcat(newcontents, "21");
+					else strcat(newcontents, "35");
 					strcat(newcontents, "\" />\n\n");
 
 
@@ -7993,7 +7989,7 @@ void ProcessAndroidExport(void)
 						strcat(newcontents, "\n\
 						<meta-data\n\
 							android:name=\"com.google.android.play.billingclient.version\"\n\
-							android:value=\"6.0.1\" />\n\
+							android:value=\"7.1.1\" />\n\
 						<activity\n\
 							android:name=\"com.android.billingclient.api.ProxyBillingActivity\"\n\
 							android:configChanges=\"keyboard|keyboardHidden|screenLayout|screenSize|orientation\"\n\
@@ -11979,9 +11975,9 @@ void ProcessAboutBox(void)
 
 			ImGui::NewLine();
 
-			tw = ImGui::CalcTextSize("AppGameKit Studio (c) 2019 TheGameCreators Ltd.");
+			tw = ImGui::CalcTextSize("AppGameKit Studio (c) 2025 DarkBasicSoftwareLimited.");
 			ImGui::SetCursorPos(ImVec2((ws.x*0.5) - (tw.x*0.5), ImGui::GetCursorPosY()));
-			ImGui::Text("AppGameKit Studio (c) 2019 TheGameCreators Ltd.");
+			ImGui::Text("AppGameKit Studio (c) 2025 DarkBasicSoftwareLimited.");
 
 			tw = ImGui::CalcTextSize("All Rights Reserved.");
 			ImGui::SetCursorPos(ImVec2((ws.x*0.5) - (tw.x*0.5), ImGui::GetCursorPosY()));
@@ -12028,6 +12024,10 @@ void ProcessAboutBox(void)
 			
 			ImGui::SetCursorPos(ImVec2((ws.x * 0.5) - (tw.x * 0.5), ImGui::GetCursorPosY()));
 			ImGui::Text("David Walker - Developer");
+
+			ImGui::SetCursorPos(ImVec2((ws.x * 0.5) - (tw.x * 0.5), ImGui::GetCursorPosY()));
+			ImGui::Text("White3 - Documentation");
+
 
 			ImGui::NewLine();
 			ImGui::EndTabItem();

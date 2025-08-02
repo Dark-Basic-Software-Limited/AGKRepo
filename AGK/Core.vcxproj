@@ -98,7 +98,7 @@
     <ExcludePath>$(ExcludePath)</ExcludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseFREE|x64'">
-    <IncludePath>$(VULKAN_SDK_PATH)\Include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VULKAN_SDK_PATH)\Vulkan\Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
     <TargetName>AGKWindows64</TargetName>
     <OutDir>platform\windows\Lib\VisualStudio\ReleaseFree64\</OutDir>
