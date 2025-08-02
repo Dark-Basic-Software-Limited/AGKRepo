@@ -303,8 +303,8 @@ int main( int argc, char* argv[] )
 	LPSTR pUserName = getenv("USERNAMEFORAGK");
 	if (pUserName)
 	{
-		sprintf(szAPKSigner, "C:\\Users\\%s\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\lib\\apksigner.jar", pUserName);
-		sprintf(szZipAlign, "C:\\Users\\%s\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\zipalign.exe", pUserName);
+		sprintf(szAPKSigner, "C:\\Users\\%s\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.1\\lib\\apksigner.jar", pUserName);
+		sprintf(szZipAlign, "C:\\Users\\%s\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.1\\zipalign.exe", pUserName);
 		sprintf(szGradleRes, "C:\\Users\\%s\\.gradle", pUserName);
 	}
 
