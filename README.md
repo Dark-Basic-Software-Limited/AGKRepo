@@ -1,5 +1,5 @@
 # AGK Repository
-New Home of AGK Source Code for 2024 and Beyond.
+New Home of AGK Source Code for 2025 and Beyond.
 
 ## WINDOWS PC INSTRUCTIONS
 The following instructions require Windows 10 or above:
@@ -7,22 +7,23 @@ The following instructions require Windows 10 or above:
 ## Pre-requisites to compile AGK Studio
 Ensure the following are installed with particular attention to the versions:
 - Install Visual Studio 2022
-- Android Studio (android-studio-2023.2.1.25-windows.exe) 
-- Android SDK 34
-- Android 14.0 platform
+- Android Studio (android-studio-2024.3.1.13-windows.exe) 
+- Android SDK 35
+- Android 15.0 platform
 - Install Java JDK 17
 - Install GitHub Desktop
 - Install Git Large File Storage (https://docs.github.com/en/repositories/working-with-files/managing-large-files/configuring-git-large-file-storage)
 
 ## Notes on project settings
-New APKs submitted to the Google Store require API 33 (Android 13) since August 2023: https://developer.android.com/google/play/requirements/target-sdk
-Small changes to any pre-API 33 projects include:
+New APKs submitted to the Google Store require API 35 (Android 15) from August 2025: https://developer.android.com/google/play/requirements/target-sdk
+Small changes to any pre-API 35 projects include:
 - Add namespace 'com.thegamecreators.agk_player2' in "AGKPlayer2\build.gradle"
 - Add mavenCentral() in "build.gradle"
 - Remove jcenter() in "build.gradle"
-- Update version classpath 'com.android.tools.build:gradle:8.1.1' // was 7.2.1
-- Update version compileSdkVersion 34 in "AGKPlayer2\build.gradle"
+- Update version classpath 'com.android.tools.build:gradle:8.9.2' // was 8.1.1
+- Update version compileSdkVersion 35 in "AGKPlayer2\build.gradle"
 - Ensure that any Android Studio project points to JDK 17 (via "Settings>Build,Exe&Dep>Build Tools>Gradle>GradleJDK")
+- Update InAppPurchase.java to comply with Google Billing 7.1.1
 
 ## Sequence to build AGK Studio
 You need to open in Android Studio and build these projects once before attempting to compile AGK:
