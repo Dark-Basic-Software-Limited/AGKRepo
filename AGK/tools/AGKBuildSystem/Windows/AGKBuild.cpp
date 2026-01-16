@@ -1041,8 +1041,24 @@ startPoint:
 
 			// copy to main folder
 			char dstFolder[ 1024 ];
-			GetCurrentDirectory( 1024, dstFolder );
-			strcat( dstFolder, "\\..\\..\\AGK Txt\\Reference" );
+
+			if (!SetCurrentDirectory("..\\..\\AGK Txt\\Reference"))
+			{
+				SetCurrentDirectoryWithCheck("..\\..\\AGK Txt");
+				GetCurrentDirectory(1024, dstFolder);
+				strcat(dstFolder, "\\Reference\\");
+				CreatePath(dstFolder);
+
+				int len = strlen(dstFolder);
+				dstFolder[len - 1] = '\0';
+			}
+			else
+			{
+				GetCurrentDirectory(1024, dstFolder);
+				//strcat(dstFolder, "\\..\\..\\AGK Txt\\Reference");
+			}
+			
+			SetCurrentDirectoryWithCheck(srcFolder);
 
 			DeleteFolder( dstFolder );
 			const char *szIgnoreExt[] = { ".txt" };

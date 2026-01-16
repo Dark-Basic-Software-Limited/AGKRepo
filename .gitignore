@@ -55,14 +55,7 @@ AGK_Build/Shared/WindowsReceive/Studio/Android/lib/armeabi-v7a/libpruneau.so
 AGK/apps/interpreter_android_google/AGKPlayer2/src/main/log.txt
 AGK/libprojects/android_assimp/log.txt
 AGK_Build/Signing/keystore.keystore
-AGK/AGK Help Generator
-AGK/AGK Help Generator/Generator/Generator.exe
-AGK/AGK Help Generator/Generator/Release64
-AGK/AGK Help Generator/Reference/Reference.exe
-AGK/AGK Help Generator/Reference/Release64
 AGK/apps/interpreter_android_google/AGKPlayer2/src/main/log.txt
-AGK/AGK Help Generator/Generator/Generator.exe
-AGK/AGK Help Generator/Reference/Reference.exe
 AGK/apps/interpreter_android_google/AGKPlayer2/src/main/log.txt
 AGK/apps/interpreter_android_ouya/AGKPlayer2/release/AGKPlayer2-release.apk
 AGK_Build/Signing/password.txt
@@ -97,3 +90,115 @@ AGK/apps/interpreter_ios_noads/Build
 AGK/apps/interpreter_mac/build
 AGK/Broadcaster/AGKBroadcaster/build
 AGK/CompilerNew/build
+AGK/apps/interpreter_android_google/AGKPlayer2/src/main/jniLibs/arm64-v8a/libandroid_player.so
+AGK/apps/interpreter_android_google/AGKPlayer2/src/main/jniLibs/armeabi-v7a/libandroid_player.so
+AGK/apps/interpreter_android_amazon/AGKPlayer2/src/main/jniLibs
+AGK/apps/interpreter_android_ouya/AGKPlayer2/src/main/jniLibs
+AGK/apps/interpreter_android_google_noads/AGKPlayer2/src/main/jniLibs/arm64-v8a/libandroid_player.so
+AGK/apps/interpreter_android_google_noads/AGKPlayer2/src/main/jniLibs/armeabi-v7a/libandroid_player.so
+AGK/apps/interpreter_android_google_native/AGKPlayer2/src/main/jniLibs
+AGK/platform/android/jni
+#AGK/AGK Help Generator
+AGK/AGK Help Generator/Generator/Generator.exe
+AGK/AGK Help Generator/Generator/Release64
+AGK/AGK Help Generator/Reference/Reference.exe
+AGK/AGK Help Generator/Reference/Release64
+AGK/AGK Help Generator/AGK Txt/Reference
+AGK/AGK Help Generator/AGK Txt/principles/0_principles.htm
+AGK/AGK Help Generator/AGK Txt/principles/1_datatypes.htm
+AGK/AGK Help Generator/AGK Txt/principles/2_operators.htm
+AGK/AGK Help Generator/AGK Txt/principles/3_common.htm
+AGK/AGK Help Generator/AGK Txt/principles/4_functions.htm
+AGK/AGK Help Generator/AGK Txt/principles/5_syntax.htm
+AGK/AGK Help Generator/AGK Txt/principles/6_loopsync.htm
+AGK/AGK Help Generator/AGK Txt/principles/7_bases.htm
+AGK/AGK Help Generator/AGK Txt/principles/8_errors.htm
+AGK/AGK Help Generator/AGK Txt/guides/0_display.htm
+AGK/AGK Help Generator/AGK Txt/guides/0_media.htm
+AGK/AGK Help Generator/AGK Txt/guides/10_ide.htm
+AGK/AGK Help Generator/AGK Txt/guides/11_spine_import.htm
+AGK/AGK Help Generator/AGK Txt/guides/12_array_changes.htm
+AGK/AGK Help Generator/AGK Txt/guides/13_shaders.htm
+AGK/AGK Help Generator/AGK Txt/guides/14_plugins.htm
+AGK/AGK Help Generator/AGK Txt/guides/1_id_numbers.htm
+AGK/AGK Help Generator/AGK Txt/guides/20_windows.htm
+AGK/AGK Help Generator/AGK Txt/guides/21_mac.htm
+AGK/AGK Help Generator/AGK Txt/guides/22_ios.htm
+AGK/AGK Help Generator/AGK Txt/guides/25_android.htm
+AGK/AGK Help Generator/AGK Txt/guides/2_images.htm
+AGK/AGK Help Generator/AGK Txt/guides/33_android.htm
+AGK/AGK Help Generator/AGK Txt/guides/3_sprites.htm
+AGK/AGK Help Generator/AGK Txt/guides/4_text.htm
+AGK/AGK Help Generator/AGK Txt/guides/50_windows.htm
+AGK/AGK Help Generator/AGK Txt/guides/51_mac.htm
+AGK/AGK Help Generator/AGK Txt/guides/52_ios.htm
+AGK/AGK Help Generator/AGK Txt/guides/54_linux.htm
+AGK/AGK Help Generator/AGK Txt/guides/5_sound.htm
+AGK/AGK Help Generator/AGK Txt/guides/60_getting_started.htm
+AGK/AGK Help Generator/AGK Txt/guides/6_music.htm
+AGK/AGK Help Generator/AGK Txt/guides/7_input.htm
+AGK/AGK Help Generator/AGK Txt/guides/8_networking.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_001.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_002.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_003.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_004.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_005.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_006.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_0061.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_0062.htm
+AGK/AGK Help Generator/AGK Txt/guides/arrays_007.htm
+AGK/AGK Help Generator/AGK Txt/guides/assignments_and_expressions.htm
+AGK/AGK Help Generator/AGK Txt/guides/assignments_and_expressions_001.htm
+AGK/AGK Help Generator/AGK Txt/guides/assignments_and_expressions_002.htm
+AGK/AGK Help Generator/AGK Txt/guides/assignments_and_expressions_003.htm
+AGK/AGK Help Generator/AGK Txt/guides/assignments_and_expressions_004.htm
+AGK/AGK Help Generator/AGK Txt/guides/assignments_and_expressions_005.htm
+AGK/AGK Help Generator/AGK Txt/guides/assignments_and_expressions_006.htm
+AGK/AGK Help Generator/AGK Txt/guides/assignments_and_expressions_007.htm
+AGK/AGK Help Generator/AGK Txt/guides/creating_first_project.htm
+AGK/AGK Help Generator/AGK Txt/guides/creating_first_project_001.htm
+AGK/AGK Help Generator/AGK Txt/guides/creating_first_project_002.htm
+AGK/AGK Help Generator/AGK Txt/guides/creating_first_project_003.htm
+AGK/AGK Help Generator/AGK Txt/guides/creating_first_project_004.htm
+AGK/AGK Help Generator/AGK Txt/guides/creating_first_project_005.htm
+AGK/AGK Help Generator/AGK Txt/guides/creating_first_project_006.htm
+AGK/AGK Help Generator/AGK Txt/guides/creating_first_project_007.htm
+AGK/AGK Help Generator/AGK Txt/guides/device_resolutions.htm
+AGK/AGK Help Generator/AGK Txt/guides/facebook.htm
+AGK/AGK Help Generator/AGK Txt/guides/facebook_setup.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_0001.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_001.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_002.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_003.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_004.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_005.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_006.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_007.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_008.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_009.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_010.htm
+AGK/AGK Help Generator/AGK Txt/guides/functions_and_branching_011.htm
+AGK/AGK Help Generator/AGK Txt/guides/LinuxTier2.htm
+AGK/AGK Help Generator/AGK Txt/guides/push_notifications_android.htm
+AGK/AGK Help Generator/AGK Txt/guides/push_notifications_ios.htm
+AGK/AGK Help Generator/AGK Txt/guides/scancodes.htm
+AGK/AGK Help Generator/AGK Txt/guides/tier1_players.htm
+AGK/AGK Help Generator/AGK Txt/guides/types.htm
+AGK/AGK Help Generator/AGK Txt/guides/types_001.htm
+AGK/AGK Help Generator/AGK Txt/guides/types_002.htm
+AGK/AGK Help Generator/AGK Txt/guides/types_003.htm
+AGK/AGK Help Generator/AGK Txt/guides/types_004.htm
+AGK/AGK Help Generator/AGK Txt/guides/types_005.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_001.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_002.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_003.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_004.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_005.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_006.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_007.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_008.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_009.htm
+AGK/AGK Help Generator/AGK Txt/guides/variables_010.htm
