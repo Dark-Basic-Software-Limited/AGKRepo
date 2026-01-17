@@ -6358,11 +6358,12 @@ void TextEditor::EnterCharacter(Char aChar, bool aShift, int codepoint)
 		lastKeyedWord[0] = 0;
 		InsertLine(coord.mLine + 1);
 		auto& line = mLines[coord.mLine];
-		auto& newLine = mLines[coord.mLine + 1];
+		auto& newLine = mLines[coord.mLine + 1]; 
 		
 		if (pref.bAutoIndentation) // mLanguageDefinition.mAutoIndentation
 		{
-			for (size_t it = 0; it < line.size() && isblank((unsigned char)line[it].mChar); ++it) {
+			size_t columns = (line.size() < coord.mColumn) ? line.size() : coord.mColumn;
+			for (size_t it = 0; it < columns && isblank((unsigned char)line[it].mChar); ++it) {
 				newLine.push_back(line[it]);
 				if (iTotalAdd < MAX_PATH - 1) {
 					cTotalAdded[iTotalAdd++] = line[it].mChar;
