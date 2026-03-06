@@ -1,6 +1,6 @@
  
   ImGui 1.92.2b released 2025.08.13
-  Google API35 released 2024.09.03
+  Google API36 released 2025.03.13
   Google Billing 7.1.1 released 2024.10.03
   Gradle 8.14 released 2025.04.25
   AGP 8.9.2 released 2025.04.21

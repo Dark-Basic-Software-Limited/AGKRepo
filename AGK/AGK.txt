@@ -1,6 +1,10 @@
 AGK Change Log
 ==============
 
+Build Studio 2026.03.05 by Zaxxan
+---------------------------------
+
+- Target API 36
 
 Build Studio 2025.11.30 by Zaxxan
 ---------------------------------

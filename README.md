@@ -8,14 +8,14 @@ The following instructions require Windows 10 or above:
 Ensure the following are installed with particular attention to the versions:
 - Install Visual Studio 2022
 - Android Studio (android-studio-2025.1.3.7-windows.exe) 
-- Android SDK 35
+- Android SDK 36
 - Android 15.0 platform
 - Install Java JDK 17
 - Install GitHub Desktop
 - Install Git Large File Storage (https://docs.github.com/en/repositories/working-with-files/managing-large-files/configuring-git-large-file-storage)
 
 ## Notes on project settings
-New APKs submitted to the Google Store require API 35 (Android 15) from August 2025: https://developer.android.com/google/play/requirements/target-sdk
+New APKs submitted to the Google Store require API 36 (Android 16) from August 2026: https://developer.android.com/google/play/requirements/target-sdk
 Small changes to any pre-API 35 projects include:
 - Add namespace 'com.thegamecreators.agk_player2' in "AGKPlayer2\build.gradle"
 - Add mavenCentral() in "build.gradle"

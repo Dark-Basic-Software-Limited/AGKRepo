@@ -6975,7 +6975,7 @@ void ProcessAndroidExport(void)
 
 	ImGui::Text("Minimum Android Version:");
 	const char* apk_version_array[] = { "5.0 (API 21)", "5.1 (API 22)", "6.0 (API 23)"
-		, "7.0 (API 24)", "7.1 (API 25)", "8.0 (API 26)", "8.1 (API 27)", "9.0 (API 28)", "10.0 (API 29)", "11.0 (API 30)", "12.0 (API 31)", "13.0 (API 33)", "14.0 (API 34)", "15.0 (API 35)" };
+		, "7.0 (API 24)", "7.1 (API 25)", "8.0 (API 26)", "8.1 (API 27)", "9.0 (API 28)", "10.0 (API 29)", "11.0 (API 30)", "12.0 (API 31)", "13.0 (API 33)", "14.0 (API 34)", "15.0 (API 35)", "16.0 (API 36)" };
 	ImGui::SameLine();
 	ImGui::SetCursorPos(ImVec2(input_indent, ImGui::GetCursorPos().y));
 	ImGui::Combo("##comboapk_sdk_version", &pCurrentSelectedProject->apk_sdk_version, apk_version_array, IM_ARRAYSIZE(apk_version_array));
@@ -7419,6 +7419,7 @@ void ProcessAndroidExport(void)
 		if (pCurrentSelectedProject->apk_sdk_version == 11) sdk = 33; // 32 deliberately missing
 		if (pCurrentSelectedProject->apk_sdk_version == 12) sdk = 34;
 		if (pCurrentSelectedProject->apk_sdk_version == 13) sdk = 35;
+		if (pCurrentSelectedProject->apk_sdk_version == 14) sdk = 36;
 
 		char szSDK[20];
 		sprintf(szSDK, "%d", sdk);
@@ -7645,7 +7646,7 @@ void ProcessAndroidExport(void)
 		if (Valid) {
 			char curDir[MAX_PATH];
 			extern char startupFolder[MAX_PATH];
-			const char* androidJar = "android35.jar";
+			const char* androidJar = "android36.jar";
 
 #if defined(AGK_WINDOWS)
 			_getcwd(&curDir[0], MAX_PATH);
@@ -8029,7 +8030,7 @@ void ProcessAndroidExport(void)
 					
 					strcat(newcontents, "\" android:targetSdkVersion=\"");
 					if ( bIsOuya ) strcat(newcontents, "21");
-					else strcat(newcontents, "35");
+					else strcat(newcontents, "36");
 					strcat(newcontents, "\" />\n\n");
 
 
