@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:versionCode="110"
-    android:versionName="2026.03.05"
+    android:versionName="2026.05.17"
     android:installLocation="preferExternal">
 
     <uses-feature android:glEsVersion="0x00020000" android:required="true"/>

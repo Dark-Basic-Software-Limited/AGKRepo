@@ -1715,6 +1715,12 @@ void cSprite::SetAnimation ( int iFrameWidth, int iFrameHeight, int iFrameCount 
 
 	float oldScaleX = m_fWidth / m_fOrigWidth;
 	float oldScaleY = m_fHeight / m_fOrigHeight;
+
+	if ( m_eShape == eManual && (oldScaleX != 1.0f || oldScaleY != 1.0f) )
+	{
+		SetScaleByOffset( 1.0f, 1.0f );
+	}
+
 	SetSize( fNewWidth, fNewHeight );
 	if ( oldScaleX != 1 || oldScaleY != 1 ) 
 	{

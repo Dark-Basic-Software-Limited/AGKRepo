@@ -1,10 +1,12 @@
 AGK Change Log
 ==============
 
-Build Studio 2026.03.05 by Zaxxan
+Build Studio 2026.05.17 by Zaxxan
 ---------------------------------
 
 - Target API 36
+- Fix Scaled Sprite Anim vs Shape bug (https://github.com/Dark-Basic-Software-Limited/AGKRepo/issues/43)
+- Fix JoinPaths() bug where sPath was used twice instead of sPath and sPath2 (https://github.com/Dark-Basic-Software-Limited/AGK-Studio/issues/1134)
 
 Build Studio 2025.11.30 by Zaxxan
 ---------------------------------

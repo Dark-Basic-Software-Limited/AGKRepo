@@ -27059,7 +27059,8 @@ char* agk::JoinPaths( const char *szPath, const char *szPath2 )
 	sPath.Replace( '\\', '/' );
 	sPath2.Replace( '\\', '/' );
 
-	char *szNewPath = new char[ sPath.GetLength() + sPath.GetLength() + 2 ];
+	char *szNewPath = new char[ sPath.GetLength() + sPath2.GetLength() + 2 ];
+
 	strcpy( szNewPath, sPath.GetStr() );
 
 	int numChars = sPath.GetNumChars();
