@@ -48885,8 +48885,8 @@ float agk::GetObjectHeightMapHeight( uint32_t objID, float x, float z )
 //   for each mesh by using <i>SetObjectMeshImage</i>. Each mesh can have up to 8 images assigned
 //   to it in the texture stages 0 to 7. If you are unsure of which texture stage to use, place the 
 //   image in stage 0. Texture stages can be used to assign multiple images to a mesh, for example 
-//   you might put the base (diffuse) texture in stage 0, a normal map in stage 1, and a light map in 
-//   stage 2. The shader used to draw this object can then combine the various textures into a pixel
+//   you might put the base (diffuse) texture in stage 0, a normal map in stage 2, and a light map in 
+//   stage 1. The shader used to draw this object can then combine the various textures into a pixel
 //   value to show on the screen.
 //   Using an image value of 0 for a particular texture stage removes any assigned image from that stage.
 // INPUTS
