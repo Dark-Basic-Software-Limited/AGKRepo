@@ -11967,9 +11967,9 @@ void ProcessAboutBox(void)
 
 			ImGui::NewLine();
 
-			tw = ImGui::CalcTextSize("AppGameKit Studio (c) 2019 TheGameCreators Ltd.");
+			tw = ImGui::CalcTextSize("AppGameKit Studio (c) 2025 Dark Basic Software Limited.");
 			ImGui::SetCursorPos(ImVec2((ws.x*0.5) - (tw.x*0.5), ImGui::GetCursorPosY()));
-			ImGui::Text("AppGameKit Studio (c) 2019 TheGameCreators Ltd.");
+			ImGui::Text("AppGameKit Studio (c) 2025 Dark Basic Software Limited.");
 
 			tw = ImGui::CalcTextSize("All Rights Reserved.");
 			ImGui::SetCursorPos(ImVec2((ws.x*0.5) - (tw.x*0.5), ImGui::GetCursorPosY()));

@@ -2811,6 +2811,7 @@ int app::Loop (void)
 
 				ImGui::Separator();
 
+#ifndef AGK_MACOS
 				if (ImGui::MenuItem("Export Project to Android")) {
 					//From Mike , compile before export.
 					if (pCurrentSelectedProject) CompileProject(pCurrentSelectedProject, false, false, false); // flags: run,broadcast,debug.
@@ -2869,6 +2870,7 @@ int app::Loop (void)
 				#endif
 #endif
 				}
+#endif
 
 #ifdef AGK_MACOS
 				if (ImGui::MenuItem("Export Project to iOS")) {
@@ -2884,6 +2886,7 @@ int app::Loop (void)
 				}
 #endif
 
+#ifndef AGK_MACOS
 				if (ImGui::MenuItem("Export Project to HTML5")) {
 					//Compile before export.
 					if (pCurrentSelectedProject) CompileProject(pCurrentSelectedProject, false, false, false); // flags: run,broadcast,debug.
@@ -2894,6 +2897,7 @@ int app::Loop (void)
 					show_html5export_window = true;
 #endif
 				}
+#endif
 
 //				if (ImGui::MenuItem("Publish to workshop")) {
 //				}
@@ -3809,7 +3813,7 @@ int app::Loop (void)
 			}
 			if (ImGui::BeginMenu("Help"))
 			{
-
+#ifndef AGK_MACOS
 				if (ImGui::MenuItem("User Guide")) {
 #ifdef AGK_WINDOWS
 					uString usDoc = startupFolder;
@@ -3831,6 +3835,7 @@ int app::Loop (void)
 					agk::OpenBrowser("http://publicdata.thegamecreators.com/Docs/AppGameKit%20Studio%20Command%20References.pdf");
 #endif
 				}
+#endif
 
 				if (ImGui::MenuItem("AppGameKit Documentation")) {
 					agk::OpenBrowser("https://www.appgamekit.com/documentation-studio/home.html");
@@ -3857,20 +3862,24 @@ int app::Loop (void)
 				if (ImGui::MenuItem("AppGameKit Website")) {
 					agk::OpenBrowser("https://www.appgamekit.com/");
 				}
+                
+#ifndef AGK_MACOS
 				if (ImGui::MenuItem("TheGameCreators Website")) {
 					agk::OpenBrowser("https://www.thegamecreators.com/");
 				}
 				if (ImGui::MenuItem("Community Forum")) {
 					agk::OpenBrowser("https://forum.thegamecreators.com/");
 				}
-
+#endif
+                
 				if (ImGui::MenuItem("AppGameKit Discord Group")) {
 					agk::OpenBrowser("https://discord.gg/7ENUvnE");
 				}
 
 				//AppGameKit Discord Group
 
-				ImGui::Separator();
+#ifndef AGK_MACOS
+                ImGui::Separator();
 
 				if (ImGui::MenuItem("AppGameKit Player for Android")) {
 					agk::OpenBrowser("https://play.google.com/store/apps/details?id=com.thegamecreators.agk_player2");
@@ -3878,8 +3887,8 @@ int app::Loop (void)
 				if (ImGui::MenuItem("AppGameKit Player for IOS")) {
 					agk::OpenBrowser("https://itunes.apple.com/us/app/appgamekit-player/id1071731293?mt=8");
 				}
-
-
+#endif
+                
 #ifdef TRIALVERSIONEXPIRES
 				ImGui::Separator();
 				if (ImGui::MenuItem("Upgrade To Full Version")) {
