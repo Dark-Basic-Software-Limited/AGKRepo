@@ -8,6 +8,7 @@
 
 #include "imgui.h"
 #include "imgui_draw.cpp"
+#include "imgui_scrollbar_arrows.cpp"
 #include "imgui_widgets.cpp"
 #include "imgui_tables.cpp"
 #include "imconfig.h"

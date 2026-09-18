@@ -18,6 +18,7 @@
 // Includes
 #include "Ide.h"
 #include "agk.h"
+#include "WinVirtualKeys.h"
 #include "gui.h"
 #include "files.h"
 #include "project.h"
@@ -3609,6 +3610,7 @@ int app::Loop (void)
 				if (ImGui::MenuItem("AppGameKit Website")) {
 					agk::OpenBrowser("https://www.appgamekit.com/");
 				}
+#ifndef AGK_MACOS
 				if (ImGui::MenuItem("AppGameKit GitHub Respository")) {
 					agk::OpenBrowser("https://github.com/Dark-Basic-Software-Limited/AGKRepo/");
 				}
@@ -3629,6 +3631,7 @@ int app::Loop (void)
 				if (ImGui::MenuItem("AppGameKit Player for Android")) {
 					agk::OpenBrowser("https://play.google.com/store/apps/details?id=com.thegamecreators.agk_player2");
 				}
+#endif
 				#ifdef AGK_MACOS
 				if (ImGui::MenuItem("AppGameKit Player for IOS")) {
 					agk::OpenBrowser("https://itunes.apple.com/us/app/appgamekit-player/id1071731293?mt=8");
@@ -4714,7 +4717,11 @@ int app::Loop (void)
 					// Sort alphabetically by name
 					std::sort(sortedFiles.begin(), sortedFiles.end(), 
 						[](const cProjectItem::sProjectFiles* a, const cProjectItem::sProjectFiles* b) {
+#ifdef AGK_WINDOWS
 							return _stricmp(a->m_sName.GetStr(), b->m_sName.GetStr()) < 0;
+#else
+							return strcasecmp(a->m_sName.GetStr(), b->m_sName.GetStr()) < 0;
+#endif
 						});
 
 					// Display files in alphabetical order

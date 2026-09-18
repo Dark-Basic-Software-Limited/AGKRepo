@@ -1,6 +1,7 @@
 //import test project.
 
 #include "agk.h"
+#include "WinVirtualKeys.h"
 #include "Ide.h"
 #include "gui.h"
 #include "TextEditor.h"

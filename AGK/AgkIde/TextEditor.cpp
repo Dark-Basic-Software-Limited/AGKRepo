@@ -8,6 +8,7 @@
 #include <regex>
 #include <cmath>
 #include "agk.h"
+#include "WinVirtualKeys.h"
 
 #include "TextEditor.h"
 #include "AGKCommands.h"
