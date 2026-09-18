@@ -517,7 +517,7 @@
 					../../renderer,
 				);
 				INFOPLIST_FILE = "agkinterpreter-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				LIBRARY_SEARCH_PATHS = (
 					../../platform/apple/Lib/Release,
@@ -573,7 +573,7 @@
 					../../renderer,
 				);
 				INFOPLIST_FILE = "agkinterpreter-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				LIBRARY_SEARCH_PATHS = (
 					../../platform/apple/Lib/Release,
