@@ -6332,7 +6332,8 @@ void agk::OpenBrowser( const char* url )
 	sURL.ReplaceStr( " ", "%20" ); // iOS doesn't like unencoded spaces
     
     NSURL *uURL = [NSURL URLWithString:[NSString stringWithCString:sURL.GetStr() encoding:NSUTF8StringEncoding]];
-    [[UIApplication sharedApplication] openURL:uURL];
+    if ( !uURL ) return;
+    [[UIApplication sharedApplication] openURL:uURL options:@{} completionHandler:nil];
 }
 
 uint32_t agk::RunApp( const char *szFilename, const char *szParameters )
@@ -6780,7 +6781,7 @@ void agk::GameCenterLogin()
     
     if ( m_iGameCenterLogin < 0 )
     {
-        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"gamecenter:"]];
+        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"gamecenter:"] options:@{} completionHandler:nil];
         return;
     }
     
