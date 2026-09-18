@@ -94,7 +94,7 @@ Ensure the following are installed:
 ○ DTXcode
 ○ DTXcodeBuild
 - If any of those fields are copied incorrectly then Apple will reject any IPA exported from the Studio IDE.
-- Once the Info.plist file has been modified, save it, close both and the copy the AgkIde version into the build folder, for example mine would be copied to “/Users/myname/AGKStudioBuild/AppGameKitStudio/AppGameKitStudio.app/Contents/Resources/media/data/ios/source/AppGameKit Player.app/Info.plist”. Only copy the plist file, do not overwrite the entire .app folder
+- Once the Info.plist file has been modified, save it, close both and the copy the AgkIde version into the build folder, for example mine would be copied to “/Users/myname/AGKStudioBuild/AppGameKitStudio/AppGameKitStudio.app/Contents/Resources/media/data/ios/source/AppGameKit Player.app/Info.plist”, or more cleanly at "/Users/myname/TGC/DEV/AGKREPO/AGK_Build/Builds/Studio/AGKStudioMac". Only copy the plist file, do not overwrite the entire .app folder
 
 ## LINUX INSTRUCTIONS
 The Linux source code is not supported in the AGKREPO at this time.
