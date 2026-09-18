@@ -59,7 +59,7 @@ The following instructions require a modern Mac or Mac-Mini:
 
 ## Pre-requisites to compile the Apple binaries
 Ensure the following are installed:
-- XCODE 16 (using SDK 18)
+- XCODE using SDK 26
 - Install GitHub Desktop for Mac-Mini
 - Select YES to any prompt asking to initialize Git Large File Storage
 
@@ -95,6 +95,7 @@ Ensure the following are installed:
 ○ DTXcodeBuild
 - If any of those fields are copied incorrectly then Apple will reject any IPA exported from the Studio IDE.
 - Once the Info.plist file has been modified, save it, close both and the copy the AgkIde version into the build folder, for example mine would be copied to “/Users/myname/AGKStudioBuild/AppGameKitStudio/AppGameKitStudio.app/Contents/Resources/media/data/ios/source/AppGameKit Player.app/Info.plist”, or more cleanly at "/Users/myname/TGC/DEV/AGKREPO/AGK_Build/Builds/Studio/AGKStudioMac". Only copy the plist file, do not overwrite the entire .app folder
+- For making a Steam Build, take the contennts of the build area and zip it up, carefully prepare a new set of deployable files from this zip, then release
 
 ## LINUX INSTRUCTIONS
 The Linux source code is not supported in the AGKREPO at this time.
