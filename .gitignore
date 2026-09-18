@@ -96,3 +96,6 @@ AGK/apps/interpreter_ios_noads/Build
 AGK/apps/interpreter_mac/build
 AGK/Broadcaster/AGKBroadcaster/build
 AGK/CompilerNew/build
+AGK/tools/AGKBuildSystem/Mac/.claude/worktrees/jovial-lovelace/
+AGK/tools/AGKBuildSystem/Mac/.claude/worktrees/serene-neumann/
+AGK/tools/AGKBuildSystem/Mac/.claude/worktrees/trusting-golick/
