@@ -2,11 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:versionCode="99"
-    android:versionName="2021.02.09"
-    package="com.thegamecreators.agk_player2"
+    android:versionName="2025.11.30"
     android:installLocation="preferExternal">
 
     <uses-feature android:glEsVersion="0x00020000" android:required="true"/>
+    <!-- Optional Vulkan support: allow Vulkan-capable devices to use Vulkan while keeping GLES fallback -->
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="4194304" android:required="false"/>
+    <uses-feature android:name="android.hardware.vulkan.level" android:version="0" android:required="false"/>
     
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>

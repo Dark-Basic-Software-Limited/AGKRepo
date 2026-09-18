@@ -2111,30 +2111,30 @@ static void on_android_dialog_response(GtkDialog *dialog, gint response, gpointe
 
 		g_free(zip_add_file);
 		zip_add_file = g_build_path("/", android_folder, "lib", "arm64-v8a", "libandroid_player.so", NULL);
-		mz_zip_writer_add_file(&zip_archive, "lib/arm64-v8a/libandroid_player.so", zip_add_file, NULL, 0, 9);
+		mz_zip_writer_add_file(&zip_archive, "lib/arm64-v8a/libandroid_player.so", zip_add_file, NULL, 0, 0);
 
 		g_free(zip_add_file);
 		zip_add_file = g_build_path("/", android_folder, "lib", "armeabi-v7a", "libandroid_player.so", NULL);
-		mz_zip_writer_add_file(&zip_archive, "lib/armeabi-v7a/libandroid_player.so", zip_add_file, NULL, 0, 9);
+		mz_zip_writer_add_file(&zip_archive, "lib/armeabi-v7a/libandroid_player.so", zip_add_file, NULL, 0, 0);
 
 		g_free(zip_add_file);
 		zip_add_file = g_build_path("/", android_folder, "lib", "x86", "libandroid_player.so", NULL);
-		mz_zip_writer_add_file(&zip_archive, "lib/x86/libandroid_player.so", zip_add_file, NULL, 0, 9);
+		mz_zip_writer_add_file(&zip_archive, "lib/x86/libandroid_player.so", zip_add_file, NULL, 0, 0);
 
 		if (arcore_mode > 0)
 		{
 			// use real ARCore lib
 			g_free(zip_add_file);
 			zip_add_file = g_build_path("/", android_folder, "lib", "arm64-v8a", "libarcore_sdk.so", NULL);
-			mz_zip_writer_add_file(&zip_archive, "lib/arm64-v8a/libarcore_sdk.so", zip_add_file, NULL, 0, 9);
+			mz_zip_writer_add_file(&zip_archive, "lib/arm64-v8a/libarcore_sdk.so", zip_add_file, NULL, 0, 0);
 
 			g_free(zip_add_file);
 			zip_add_file = g_build_path("/", android_folder, "lib", "armeabi-v7a", "libarcore_sdk.so", NULL);
-			mz_zip_writer_add_file(&zip_archive, "lib/armeabi-v7a/libarcore_sdk.so", zip_add_file, NULL, 0, 9);
+			mz_zip_writer_add_file(&zip_archive, "lib/armeabi-v7a/libarcore_sdk.so", zip_add_file, NULL, 0, 0);
 
 			g_free(zip_add_file);
 			zip_add_file = g_build_path("/", android_folder, "lib", "x86", "libarcore_sdk.so", NULL);
-			mz_zip_writer_add_file(&zip_archive, "lib/x86/libarcore_sdk.so", zip_add_file, NULL, 0, 9);
+			mz_zip_writer_add_file(&zip_archive, "lib/x86/libarcore_sdk.so", zip_add_file, NULL, 0, 0);
 		}
 
 		while (gtk_events_pending())

@@ -918,14 +918,6 @@ void TextEditor::Help( void )
 	strcpy(cHelp, "");
 
 	//Try to locate what we are searching for.
-
-	if (strcmp(mLanguageDefinition.mName.c_str(), "GLSL") == 0 ) {
-		processhelp("media/Help/guides/13_shaders.htm", true);
-		ImGui::SetWindowFocus(ICON_MD_HELP  " Help");
-		return;
-	}
-	
-
 	if (HasSelection())
 	{
 		if (strlen(GetSelectedText().c_str()) < MAX_PATH) {
@@ -948,9 +940,9 @@ void TextEditor::Help( void )
 	char curDir[MAX_PATH];
 
 #ifdef AGK_WINDOWS
-		_getcwd(&curDir[0], MAX_PATH); 
+	_getcwd(&curDir[0], MAX_PATH);
 #else
-		getcwd(&curDir[0], MAX_PATH);
+	getcwd(&curDir[0], MAX_PATH);
 #endif
 
 	int index = tolower( char(cHelp[0]) );
@@ -974,10 +966,10 @@ void TextEditor::Help( void )
 					else {
 						strcat(curDir, "\\");
 						strcat(curDir, (char*)sKeyNext->m_cCommandPath.GetStr());
-						
-						agk::OpenBrowser(curDir);
 
+						agk::OpenBrowser(curDir);
 					}
+					
 					break;
 				}
 			}
@@ -988,6 +980,70 @@ void TextEditor::Help( void )
 
 	return;
 }
+
+
+void TextEditor::BrowserHelp(void)
+{
+	strcpy(cHelp, "");
+
+	//Try to locate what we are searching for.
+	if (HasSelection())
+	{
+		if (strlen(GetSelectedText().c_str()) < MAX_PATH) {
+			strcpy(cHelp, GetSelectedText().c_str());
+		}
+
+	}
+	else {
+
+		std::string wuc = GetWordUnderCursor();
+		if (strlen(wuc.c_str()) < MAX_PATH && strlen(wuc.c_str()) > 1) {
+			strcpy(cHelp, wuc.c_str());
+		}
+	}
+
+	if (strlen(cHelp) < 2)
+		return;
+
+	//Try to find help.
+	char curDir[MAX_PATH];
+
+#ifdef AGK_WINDOWS
+	_getcwd(&curDir[0], MAX_PATH);
+#else
+	getcwd(&curDir[0], MAX_PATH);
+#endif
+
+	int index = tolower(char(cHelp[0]));
+	uString usHelp = cHelp;
+	usHelp.Lower();
+	sKeyNext = sKeywordHelp[index];
+	if (sKeyNext && sKeyNext->m_pNext) {
+		sKeyNext = sKeyNext->m_pNext;
+
+		while (sKeyNext != NULL) {
+			if (strcmp(usHelp.GetStr(), sKeyNext->m_cLowerCommand) == 0) {
+				//found it display page.
+				if (sKeyNext->m_cCommandPath.GetLength() > 0) {
+
+					//browser help
+					strcat(curDir, "\\");
+					strcat(curDir, (char*)sKeyNext->m_cCommandPath.GetStr());
+
+					agk::OpenBrowser(curDir);
+
+				
+					break;
+				}
+			}
+			sKeyNext = sKeyNext->m_pNext;
+		}
+
+	}
+
+	return;
+}
+
 
 static float oldscrollX;
 static float oldscrollY;
@@ -1240,7 +1296,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 		Keyboard inputs
 	*/
 
-	ImGui::PushAllowKeyboardFocus(true);
+	ImGui::PushItemFlag(ImGuiItemFlags_NoTabStop, false);
 	ImGuiIO& io = ImGui::GetIO();
 	auto shift = io.KeyShift;
 	auto ctrl = io.ConfigMacOSXBehaviors ? io.KeySuper : io.KeyCtrl;
@@ -1249,6 +1305,29 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 		ctrl = io.KeyCtrl;
 		alt = io.KeyAlt;
 	}
+
+	// Map Win32 Virtual-Key codes (used by preferences) to ImGuiKey for IsKeyPressed with ImGui 1.90+
+	auto VkToImGuiKey = [](int vk) -> ImGuiKey
+	{
+		switch (vk)
+		{
+			case '0': return ImGuiKey_0; case '1': return ImGuiKey_1; case '2': return ImGuiKey_2; case '3': return ImGuiKey_3; case '4': return ImGuiKey_4;
+			case '5': return ImGuiKey_5; case '6': return ImGuiKey_6; case '7': return ImGuiKey_7; case '8': return ImGuiKey_8; case '9': return ImGuiKey_9;
+			case 'A': return ImGuiKey_A; case 'B': return ImGuiKey_B; case 'C': return ImGuiKey_C; case 'D': return ImGuiKey_D; case 'E': return ImGuiKey_E;
+			case 'F': return ImGuiKey_F; case 'G': return ImGuiKey_G; case 'H': return ImGuiKey_H; case 'I': return ImGuiKey_I; case 'J': return ImGuiKey_J;
+			case 'K': return ImGuiKey_K; case 'L': return ImGuiKey_L; case 'M': return ImGuiKey_M; case 'N': return ImGuiKey_N; case 'O': return ImGuiKey_O;
+			case 'P': return ImGuiKey_P; case 'Q': return ImGuiKey_Q; case 'R': return ImGuiKey_R; case 'S': return ImGuiKey_S; case 'T': return ImGuiKey_T;
+			case 'U': return ImGuiKey_U; case 'V': return ImGuiKey_V; case 'W': return ImGuiKey_W; case 'X': return ImGuiKey_X; case 'Y': return ImGuiKey_Y; case 'Z': return ImGuiKey_Z;
+			case VK_OEM_PLUS: return ImGuiKey_Equal; case VK_OEM_MINUS: return ImGuiKey_Minus; case VK_OEM_COMMA: return ImGuiKey_Comma; case VK_OEM_PERIOD: return ImGuiKey_Period; case VK_OEM_2: return ImGuiKey_Slash;
+			case VK_PRIOR: return ImGuiKey_PageUp; case VK_NEXT: return ImGuiKey_PageDown; case VK_HOME: return ImGuiKey_Home; case VK_END: return ImGuiKey_End;
+			case VK_LEFT: return ImGuiKey_LeftArrow; case VK_RIGHT: return ImGuiKey_RightArrow; case VK_UP: return ImGuiKey_UpArrow; case VK_DOWN: return ImGuiKey_DownArrow;
+			case VK_DELETE: return ImGuiKey_Delete; case VK_BACK: return ImGuiKey_Backspace; case VK_SPACE: return ImGuiKey_Space; case VK_TAB: return ImGuiKey_Tab; case VK_RETURN: return ImGuiKey_Enter;
+			case VK_F1: return ImGuiKey_F1; case VK_F2: return ImGuiKey_F2; case VK_F3: return ImGuiKey_F3; case VK_F4: return ImGuiKey_F4; case VK_F5: return ImGuiKey_F5; case VK_F6: return ImGuiKey_F6;
+			case VK_F7: return ImGuiKey_F7; case VK_F8: return ImGuiKey_F8; case VK_F9: return ImGuiKey_F9; case VK_F10: return ImGuiKey_F10; case VK_F11: return ImGuiKey_F11; case VK_F12: return ImGuiKey_F12;
+			default:
+				return ImGuiKey_None;
+		}
+	};
 
 	bool is_osx = io.ConfigMacOSXBehaviors;
 	bTabPressed = false;
@@ -1271,7 +1350,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 		io.WantCaptureKeyboard = true;
 		io.WantTextInput = true;
 //		if (!IsReadOnly() && ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Z))) {
-		if (!IsReadOnly() && ctrl==pref.bUndoCtrl && shift==pref.bUndoShift && alt==pref.bUndoAlt && ImGui::IsKeyPressed(pref.iUndoKey)) {
+		if (!IsReadOnly() && ctrl==pref.bUndoCtrl && shift==pref.bUndoShift && alt==pref.bUndoAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iUndoKey))) {
 			Undo();
 			bFreezeWord = false;
 		}
@@ -1290,22 +1369,18 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				}
 			}
 		}
-		else if (!IsReadOnly() && !ctrl && !shift && alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace))) {
+	else if (!IsReadOnly() && !ctrl && !shift && alt && ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
 			Undo();
 			bFreezeWord = false;
 		}
-		else if (!IsReadOnly() && ctrl==pref.bRedoCtrl && shift==pref.bRedoShift && alt==pref.bRedoAlt && ImGui::IsKeyPressed(pref.iRedoKey)) {
+		else if (!IsReadOnly() && ctrl==pref.bRedoCtrl && shift==pref.bRedoShift && alt==pref.bRedoAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iRedoKey))) {
 			Redo();
 			bFreezeWord = false;
 		}
-		else if (!IsReadOnly() && ctrl && !shift && !alt && ImGui::IsKeyPressed(0x53)) { // 0x53 = s IsKeyPressed
+		else if (!IsReadOnly() && ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_S)) { // Ctrl+S
 			saveonreturn = true; // save file on returning.
 			//Need to reset keys when we use blocking dialogs , or they can hang.
-			io.KeysDown[0x53] = false; // reset key.
-			io.KeySuper = false;
-			io.KeyCtrl = false;
-			io.KeyShift = false;
-			agk::KeyUp(0x53); // reset key.
+			agk::KeyUp('S'); // reset key.
 			agk::KeyUp(16); // reset shift key.
 			agk::KeyUp(17); // reset key.
 			agk::KeyUp(18); // reset key.
@@ -1315,7 +1390,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			}
 
 		}
-		else if (!IsReadOnly() && ctrl && shift && !alt && ImGui::IsKeyPressed(0x46)) { // 0x46 = f
+		else if (!IsReadOnly() && ctrl && shift && !alt && ImGui::IsKeyPressed(ImGuiKey_F)) { // Ctrl+Shift+F
 			//CTRL+SHIFT+F bring replace dialog up, include advanced search.
 			bFreezeWord = false;
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
@@ -1325,7 +1400,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			}
 
 		}
-		else if (ctrl==pref.bFindCtrl && shift==pref.bFindShift && alt==pref.bFindAlt && ImGui::IsKeyPressed(pref.iFindKey)) { // 0x46 = f
+		else if (ctrl==pref.bFindCtrl && shift==pref.bFindShift && alt==pref.bFindAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iFindKey))) {
 			bFreezeWord = false;
 			replaceactive = false;
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
@@ -1333,7 +1408,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				lastKeySearch = (float)ImGui::GetTime();
 			}
 		}
-		else if (ctrl == pref.bGoToDefinitionCtrl && shift == pref.bGoToDefinitionShift && alt == pref.bGoToDefinitionAlt && ImGui::IsKeyPressed(pref.iGoToDefinitionKey)) {
+		else if (ctrl == pref.bGoToDefinitionCtrl && shift == pref.bGoToDefinitionShift && alt == pref.bGoToDefinitionAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iGoToDefinitionKey))) {
 			//Go To Definition.
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 
@@ -1414,7 +1489,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			}
 		}
 		// //~
-		else if (ctrl == pref.bDuplicateLineCtrl && shift == pref.bDuplicateLineShift && alt == pref.bDuplicateLineAlt && ImGui::IsKeyPressed(pref.iDuplicateLineKey)) {
+		else if (ctrl == pref.bDuplicateLineCtrl && shift == pref.bDuplicateLineShift && alt == pref.bDuplicateLineAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iDuplicateLineKey))) {
 			
 			if (mState.mCursorPosition.mLine+1 < mLines.size()) {
 
@@ -1430,7 +1505,11 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				newcordsend.mLine++;
 
 				std::string linetext = GetText( newcords, newcordsend );
-				filechanged = true;
+				// Only mark the file changed and add an undo record if the buffer
+				// actually changes. Some callers may call this on read-only or
+				// non-editable contexts (for example scene files) where nothing
+				// should happen.
+				bool beforeTextChanged = mTextChanged;
 				UndoRecord u;
 				u.mBefore = mState;
 				u.mAdded = linetext;
@@ -1465,14 +1544,28 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				mState.mSelectionEnd = oldse;
 			}
 		}
-		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(69)) { // 69 = e
+		else if (ctrl == pref.bCommentLinesCtrl && shift == pref.bCommentLinesShift && alt == pref.bCommentLinesAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iCommentLinesKey))) {
+			// Comment Lines shortcut
+			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
+				CommentSelectedLines();
+				lastKeySearch = (float)ImGui::GetTime();
+			}
+		}
+		else if (ctrl == pref.bUncommentLinesCtrl && shift == pref.bUncommentLinesShift && alt == pref.bUncommentLinesAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iUncommentLinesKey))) {
+			// Uncomment Lines shortcut
+			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
+				UncommentSelectedLines();
+				lastKeySearch = (float)ImGui::GetTime();
+			}
+		}
+		else if (ctrl == pref.bToggleCommentCtrl && shift == pref.bToggleCommentShift && alt == pref.bToggleCommentAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iToggleCommentKey))) {
 			bFreezeWord = false;
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 				ToggleLineComments();
 				lastKeySearch = (float)ImGui::GetTime();
 			}
 		}
-		else if (ctrl && !shift && !alt && (ImGui::IsKeyPressed(190) || ImGui::IsKeyPressed(191)) ) { // 190 = .
+		else if (ctrl && !shift && !alt && (ImGui::IsKeyPressed(ImGuiKey_Period) || ImGui::IsKeyPressed(ImGuiKey_Slash)) ) {
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 				int first = -1,first_mark = 0;
 				TextEditor * first_InsideEditor,*best_InsideEditor,*set_InsideEditor;
@@ -1567,7 +1660,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				lastKeySearch = (float)ImGui::GetTime();
 			}
 		}
-		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(188)) { // 188 = ,
+		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Comma)) {
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 
 				int first = -1, first_mark = 0;
@@ -1660,7 +1753,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				*/
 			}
 		}
-		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(77)) { // 77 = m
+		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_M)) {
 			//BookMarks
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 
@@ -1683,7 +1776,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				lastKeySearch = (float)ImGui::GetTime();
 			}
 		}
-		else if (ctrl==pref.bReplaceCtrl && shift==pref.bReplaceShift && alt==pref.bReplaceAlt && ImGui::IsKeyPressed(pref.iReplaceKey)) { // 0x48 = h
+		else if (ctrl==pref.bReplaceCtrl && shift==pref.bReplaceShift && alt==pref.bReplaceAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iReplaceKey))) {
 			bFreezeWord = false;
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 				Replace();
@@ -1691,7 +1784,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			}
 		}
 
-		else if( ctrl==pref.bFindNextCtrl && shift==pref.bFindNextShift && alt==pref.bFindNextAlt && ImGui::IsKeyPressed(pref.iFindNextKey)) { // 0x72 = F3
+		else if( ctrl==pref.bFindNextCtrl && shift==pref.bFindNextShift && alt==pref.bFindNextAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iFindNextKey))) {
 			bFreezeWord = false;
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 				if (strlen(cSearch) > 0)
@@ -1699,18 +1792,21 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				lastKeySearch = (float)ImGui::GetTime();
 			}
 		}
-		else if (ImGui::IsKeyPressed(0x70)) { // 0x70 = F1
+		else if (ImGui::IsKeyPressed(ImGuiKey_F1)) {
 			bFreezeWord = false;
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
-				if (pref.bBrowserHelp == false){
+			
+				if (pref.bBrowserHelp == false) {
 					pref.bDisplayHelpWindow = true;
 				}
 				Help();
+
 				lastKeySearch = (float)ImGui::GetTime();
 
 			}
 		}
-		else if (ImGui::IsKeyPressed(0x78)) { // 0x78 = F9 , toggle breakpoint.
+		
+		else if (ctrl == pref.bFindNextCtrl && shift == pref.bFindNextShift && alt == pref.bFindNextAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iBreakPointToggleKey))) { // toggle breakpoint.
 
 			if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 				if (bpts.count(mState.mCursorPosition.mLine + 1) != 0)
@@ -1742,7 +1838,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			}
 
 		}
-		else if (!ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow))) {
+		else if (!ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
 
 			timeStart = std::chrono::system_clock::now();
 			//return system_clock::time_point(++s);
@@ -1759,7 +1855,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			}
 			bFreezeWord = false;
 		}
-		else if (!ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow))) {
+		else if (!ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
 			timeStart = std::chrono::system_clock::now();
 			if (bSuggestActice)
 			{
@@ -1775,19 +1871,19 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 		}
 
 		//MAC Different.
-		else if (keyboard_layout != 0 && is_osx && alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow))) {
+	else if (keyboard_layout != 0 && is_osx && alt && ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
 			timeStart = std::chrono::system_clock::now();
 			MoveLeft(1, shift, true);
 			bEnableSuggest = false; //Cursor keys disable autocompleate until a new char is entered.
 			bSuggestActice = false;
 		}
-		else if (keyboard_layout != 0 && is_osx && alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow))) {
+	else if (keyboard_layout != 0 && is_osx && alt && ImGui::IsKeyPressed(ImGuiKey_RightArrow)) {
 			timeStart = std::chrono::system_clock::now();
 			MoveRight(1, shift, true);
 			bEnableSuggest = false; //Cursor keys disable autocompleate until a new char is entered.
 			bSuggestActice = false;
 		}
-		else if (!alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow))) {
+	else if (!alt && ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
 			timeStart = std::chrono::system_clock::now();
 			if (ctrl && keyboard_layout != 0 && is_osx) {
 				MoveHome(shift);
@@ -1799,7 +1895,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			bEnableSuggest = false; //Cursor keys disable autocompleate until a new char is entered.
 			bSuggestActice = false;
 		}
-		else if (!alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow))) {
+	else if (!alt && ImGui::IsKeyPressed(ImGuiKey_RightArrow)) {
 			timeStart = std::chrono::system_clock::now();
 			if (ctrl && keyboard_layout != 0 && is_osx) {
 				MoveEnd(shift);
@@ -1813,48 +1909,48 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 		}
 		
 
-		else if (!alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_PageUp))) {
+	else if (!alt && ImGui::IsKeyPressed(ImGuiKey_PageUp)) {
 			MoveUp(GetPageSize() - 4, shift);
 			bFreezeWord = false;
 			bEnableSuggest = false; //Cursor keys disable autocompleate until a new char is entered.
 		}
-		else if (!alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_PageDown))) {
+	else if (!alt && ImGui::IsKeyPressed(ImGuiKey_PageDown)) {
 			MoveDown(GetPageSize() - 4, shift);
 			bFreezeWord = false;
 			bEnableSuggest = false; //Cursor keys disable autocompleate until a new char is entered.
 		}
-		else if (!alt && ctrl && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Home))) {
+	else if (!alt && ctrl && ImGui::IsKeyPressed(ImGuiKey_Home)) {
 			MoveTop(shift);
 			bFreezeWord = false;
 		}
-		else if (ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_End))) {
+	else if (ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_End)) {
 			MoveBottom(shift);
 			bFreezeWord = false;
 		}
-		else if (!ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Home))) {
+	else if (!ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_Home)) {
 			MoveHome(shift);
 			bFreezeWord = false;
 		}
-		else if (!ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_End))) {
+	else if (!ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_End)) {
 			MoveEnd(shift);
 			bFreezeWord = false;
 		}
-		else if (!IsReadOnly() && !ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Delete))) {
+	else if (!IsReadOnly() && !ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
 			Delete();
 			bFreezeWord = false;
 			mState.mSelectionStart = mState.mSelectionEnd = mState.mCursorPosition;
 			mInteractiveStart = mInteractiveEnd = mState.mCursorPosition;
 
 		}
-		else if (!IsReadOnly() && !ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace))) {
+	else if (!IsReadOnly() && !ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
 			BackSpace();
 			bFreezeWord = false;
 		}
-		else if (!IsReadOnly() && !ctrl && shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace))) {
+	else if (!IsReadOnly() && !ctrl && shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
 			BackSpace();
 			bFreezeWord = false;
 		}
-		else if (!IsReadOnly() && ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace))) {
+	else if (!IsReadOnly() && ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
 			//Delete word to left.
 			MoveLeft(1, true, true);
 			BackSpace();
@@ -1863,50 +1959,50 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 
 			bFreezeWord = false;
 		}
-		else if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Insert)))
+	else if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Insert))
 			mOverwrite ^= true;
-		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Insert)))
+	else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Insert))
 			Copy();
-		else if (!IsReadOnly() && !ctrl && shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Insert))) {
+	else if (!IsReadOnly() && !ctrl && shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Insert)) {
 			Paste();
 			bFreezeWord = false;
 		}
-		else if (ctrl && !alt && ImGui::IsKeyPressed(32)) {
+	else if (ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_Space)) {
 			bEnableFreezeInNextRun = true;
 			bEnableSuggest = true;
 		}
 		//Only Mac and when using pc keyboard layout.
 		//Emulate pc "insert" by using "delete" key instead. only for CTRL+SHIFT operations.
-		else if (is_osx && keyboard_layout == 0  && ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Delete)))
+	else if (is_osx && keyboard_layout == 0  && ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Delete))
 			Copy();
-		else if (is_osx && keyboard_layout == 0 && !IsReadOnly() && !ctrl && shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Delete))) {
+	else if (is_osx && keyboard_layout == 0 && !IsReadOnly() && !ctrl && shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
 			Paste();
 			bFreezeWord = false;
 		}
 		//
-		else if (ctrl==pref.bCopyCtrl && shift==pref.bCopyShift && alt==pref.bCopyAlt && ImGui::IsKeyPressed(pref.iCopyKey))
+	else if (ctrl==pref.bCopyCtrl && shift==pref.bCopyShift && alt==pref.bCopyAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iCopyKey)))
 			Copy();
-		else if (!IsReadOnly() && ctrl==pref.bPasteCtrl && shift==pref.bPasteShift && alt==pref.bPasteAlt && ImGui::IsKeyPressed(pref.iPasteKey)) {
+	else if (!IsReadOnly() && ctrl==pref.bPasteCtrl && shift==pref.bPasteShift && alt==pref.bPasteAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iPasteKey))) {
 			Paste();
 			bFreezeWord = false;
 		}
-		else if (ctrl==pref.bCutCtrl && shift==pref.bCutShift && alt==pref.bCutAlt && ImGui::IsKeyPressed(pref.iCutKey)) {
+	else if (ctrl==pref.bCutCtrl && shift==pref.bCutShift && alt==pref.bCutAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iCutKey))) {
 			Cut();
 			bFreezeWord = false;
 			mState.mSelectionStart = mState.mSelectionEnd = mState.mCursorPosition;
 			mInteractiveStart = mInteractiveEnd = mState.mCursorPosition;
 		}
-		else if (!ctrl && shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Delete))) {
+	else if (!ctrl && shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
 			Cut();
 			bFreezeWord = false;
 			mState.mSelectionStart = mState.mSelectionEnd = mState.mCursorPosition;
 			mInteractiveStart = mInteractiveEnd = mState.mCursorPosition;
 		}
-		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_A))) {
+	else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_A)) {
 			SelectAll();
 			bFreezeWord = false;
 		}
-		else if (!IsReadOnly() && !ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
+	else if (!IsReadOnly() && !ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
 				
 			if (bSuggestActice && !bLookupReadOnly)
 				bTabPressed = true;	//Reuse tabpressed its the same as return.
@@ -2273,7 +2369,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 		ImVec2 oldCursor = ImGui::GetCursorPos();
 		//ImGui::SetNextWindowSize(ImVec2(300, 20));
 //		ImGui::SetCursorPos(ImVec2( ImGui::GetWindowSize().x - 300, 0));
-		ImVec2 SearchDialogSize = ImVec2(59* fontSize, 24 + fontSize);//420
+	ImVec2 SearchDialogSize = ImVec2(59* fontSize, 24 + fontSize);//420
 		if (bFindNextEndOfLine || bFindPrevStartOfLine || strlen(ReplaceMsg) > 0)
 			SearchDialogSize.y += ( (fontSize*3.1) );
 		if (replaceactive) {
@@ -2288,11 +2384,13 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 		ImVec4* style_colors = ImGui::GetStyle().Colors;
 		ImVec2 window_pos = ImGui::GetWindowPos();
 		window_pos.x += (ImGui::GetWindowSize().x - SearchDialogSize.x );
-		ImGui::SetCursorPos(ImVec2(ImGui::GetScrollX()+(ImGui::GetWindowSize().x - SearchDialogSize.x), ImGui::GetScrollY() ));
+	ImGui::SetCursorPos(ImVec2(ImGui::GetScrollX()+(ImGui::GetWindowSize().x - SearchDialogSize.x), ImGui::GetScrollY() ));
 
-		ImGui::BeginChild("##SearchFindReplaceDialog", ImVec2(SearchDialogSize.x- ImGui::GetCurrentWindow()->ScrollbarSizes.x, SearchDialogSize.y), aBorder, ImGuiWindowFlags_NoMove);
+	ImGui::BeginChild("##SearchFindReplaceDialog", ImVec2(SearchDialogSize.x- ImGui::GetCurrentWindow()->ScrollbarSizes.x, SearchDialogSize.y), aBorder, ImGuiWindowFlags_NoMove);
 
-		ImGui::GetWindowDrawList()->AddRectFilled(window_pos - ImVec2(2, 2), window_pos + SearchDialogSize, ImGui::GetColorU32(ImVec4(style_colors[ImGuiCol_MenuBarBg])));
+	ImGui::GetWindowDrawList()->AddRectFilled(window_pos - ImVec2(2, 2), window_pos + SearchDialogSize, ImGui::GetColorU32(ImVec4(style_colors[ImGuiCol_MenuBarBg])));
+	// Shift all modal content down by 2px
+	ImGui::Dummy(ImVec2(0.0f, 2.0f));
 //		ImGui::PushItemWidth(SearchDialogSize.x-70.0 - (fontSize*5));
 		ImGui::PushItemWidth(SearchDialogSize.x - 70.0 - (fontSize * 13)); //8
 		ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPos().x + 10, ImGui::GetCursorPos().y));
@@ -2317,7 +2415,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 //		}
 		//ImGui::SetKeyboardFocusHere();
 		if( wtabvisible && ImGui::GetTime() - lastKeySearch >= 0.125 ) { //small delay before active.
-			if( ctrl==pref.bFindCtrl && shift==pref.bFindShift && alt==pref.bFindAlt && ImGui::IsKeyPressed(pref.iFindKey) ) { // 0x46 = f , 27 = esc.
+			if( ctrl==pref.bFindCtrl && shift==pref.bFindShift && alt==pref.bFindAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iFindKey)) ) { // find
 				ToggleSeachReplace(false);
 				lastKeySearch = (float)ImGui::GetTime();
 				bSetInputFocus = true;
@@ -2325,7 +2423,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				replaceactive = false;
 			}
 
-			if (ctrl == pref.bReplaceCtrl && shift == pref.bReplaceShift && alt == pref.bReplaceAlt && ImGui::IsKeyPressed(pref.iReplaceKey)) { // 0x48 = h
+			if (ctrl == pref.bReplaceCtrl && shift == pref.bReplaceShift && alt == pref.bReplaceAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iReplaceKey))) { // 0x48 = h
 				bFreezeWord = false;
 				if (ImGui::GetTime() - lastKeySearch >= 0.125) {
 					strcpy(ReplaceMsg, "");
@@ -2335,7 +2433,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				}
 			}
 
-			if (!IsReadOnly() && ctrl && shift && !alt && ImGui::IsKeyPressed(0x46)) { // 0x46 = f
+			if (!IsReadOnly() && ctrl && shift && !alt && ImGui::IsKeyPressed(ImGuiKey_F)) { // was 0x46 = 'F'
 				//CTRL+SHIFT+F bring replace dialog up, include advanced search.
 				bFreezeWord = false;
 				if (ImGui::GetTime() - lastKeySearch >= 0.125) {
@@ -2348,11 +2446,11 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 
 			}
 
-			if( ImGui::IsKeyPressed(27) )
+			if( ImGui::IsKeyPressed(ImGuiKey_Escape) )
 			{
 				ToggleSeachReplace(true);
 			}
-			if (ctrl == pref.bFindNextCtrl && shift == pref.bFindNextShift && alt == pref.bFindNextAlt && ImGui::IsKeyPressed(pref.iFindNextKey)) { // 0x72 = F3
+			if (ctrl == pref.bFindNextCtrl && shift == pref.bFindNextShift && alt == pref.bFindNextAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iFindNextKey))) { // 0x72 = F3
 				if (strlen(cSearch) > 0) {
 					strcpy(ReplaceMsg, "");
 					bUndoAll = 0;
@@ -2372,7 +2470,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			FindNext();
 			bSetInputFocus = true; //get focus back.
 		}
-		strcpy(cnSearch, cSearch);
+	strcpy(cnSearch, cSearch);
 
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
@@ -2837,6 +2935,9 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 		}
 		else if (replaceactive)
 		{
+			// minimal separation between Search controls and Replace section (+4px)
+			ImGui::Dummy(ImVec2(0.0f, 4.0f));
+
 			ImGui::PushItemWidth(SearchDialogSize.x - 100.0 - (fontSize * 7));
 			ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPos().x + 10, ImGui::GetCursorPos().y));
 			if (ImGui::InputText("Replace with", &cSearchReplace[0], MAX_PATH, ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue)) {
@@ -2847,6 +2948,9 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				bSetInputFocus = true; //get focus back.
 			}
 			strcpy(cnSearchReplace, cSearchReplace);
+
+			// 4px spacing between line 2 (Replace with) and line 3 (actions)
+			ImGui::Dummy(ImVec2(0.0f, 4.0f));
 
 			ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPos().x + 10, ImGui::GetCursorPos().y));
 			if (ImGui::Button("Replace")) {
@@ -2908,13 +3012,20 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 				bFindPrevStartOfLine = false;
 				mState.mCursorPosition = oldpos;
 			}
-			ImGui::SameLine();
-			ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPos().x + 6, ImGui::GetCursorPos().y));
-			ImGui::Checkbox("Match case ", &bMatchCase);
-			ImGui::SameLine();
-			ImGui::Checkbox("Word only", &bMatchWord);
-
-			ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPos().x + 10, ImGui::GetCursorPos().y+2));
+			// Position checkboxes: align "Match case" horizontally with the "In Selection" button below
+			{
+				ImGuiStyle& style = ImGui::GetStyle();
+				float btnAllProjW = ImGui::CalcTextSize("In All Project Files").x + style.FramePadding.x * 2.0f;
+				float targetX = ImGui::GetCursorPosX() + 10.0f + btnAllProjW + style.ItemSpacing.x + 6.0f;
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(targetX);
+				ImGui::Checkbox("Match case ", &bMatchCase);
+				ImGui::SameLine();
+				ImGui::Checkbox("Word only", &bMatchWord);
+			}
+			// 4px spacing before project-wide/selection actions (line 4)
+			ImGui::Dummy(ImVec2(0.0f, 4.0f));
+			ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPos().x + 10, ImGui::GetCursorPos().y));
 
 			if (pCurrentSelectedProject) {
 				if (ImGui::Button("In All Project Files")) {
@@ -3125,7 +3236,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 
 	if (!mLines.empty())
 	{
-		auto fontScale = ImGui::GetFontSize() / ImGui::GetFont()->FontSize;
+		auto fontScale = ImGui::GetFontSize() / ImGui::GetFont()->LegacySize;
 		float spaceSize = ImGui::CalcTextSize(" ").x + 1.0f * fontScale;
 
 		bInFolding = false;
@@ -4538,7 +4649,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			ImGui::EndTooltip();
 			ImGui::SetCursorPos(oldCursor);
 		}
-		if (ImGui::IsKeyPressed(27))
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape))
 		{
 			bEnableSuggest = false;
 			bSuggestActice = false;
@@ -4606,7 +4717,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 					}
 
 					if (it2 != symbolsList[activeSymbolslist].end()) {
-						if (ImGui::MenuItem("Go To Definition")) {
+						if (ImGui::MenuItem("Go To Definition (Current File)")) {
 							if (it2->second.m_InsideEditor) {
 
 								int gettotop = (winsize.y / mCharAdvance.y) - 10; //-5 lines from top.
@@ -4621,52 +4732,54 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 						}
 					}
 
-					auto it = symbolsCollectList[iCollectListActive].find(szClean.GetStr());
-					//
-					if (it != symbolsCollectList[iCollectListActive].end())
-					{
-						if (ImGui::MenuItem("Go To Definition")) {
-							if (it->second.m_InsideEditor) {
+					else{
 
-								cProjectItem::sProjectFiles * m_pCurrentFile;
-								//m_pCurrentFile = FindFileFromEditor(it->second.m_InsideEditor);
-								m_pCurrentFile = FindFileFromEditorMatchSource(it->second.m_InsideEditor);
-								if (m_pCurrentFile) {
+						auto it = symbolsCollectList[iCollectListActive].find(szClean.GetStr());
+						//
+						if (it != symbolsCollectList[iCollectListActive].end())
+						{
+							if (ImGui::MenuItem("Go To Definition (Project)")) {
+								if (it->second.m_InsideEditor) {
+
+									cProjectItem::sProjectFiles * m_pCurrentFile;
+									//m_pCurrentFile = FindFileFromEditor(it->second.m_InsideEditor);
+									m_pCurrentFile = FindFileFromEditorMatchSource(it->second.m_InsideEditor);
+									if (m_pCurrentFile) {
 									
-									if (m_pCurrentFile->m_editor) {
+										if (m_pCurrentFile->m_editor) {
 
-										if (!m_pCurrentFile->m_editor->bEditorVisible) {
-											//Make sure its docked.
-											m_pCurrentFile->m_editor->firstrun = true;
+											if (!m_pCurrentFile->m_editor->bEditorVisible) {
+												//Make sure its docked.
+												m_pCurrentFile->m_editor->firstrun = true;
+											}
+											m_pCurrentFile->m_editor->bEditorVisible = true;
 										}
-										m_pCurrentFile->m_editor->bEditorVisible = true;
-									}
 									
-									cNextWindowFocus = (char *)m_pCurrentFile->m_sEditName.GetStr();
-									bFocusActiveEditor = true;
-								}
-								//Focus.
-								int gettotop = (winsize.y / mCharAdvance.y) - 10; //-5 lines from top.
-								if (gettotop <= 0)
-									gettotop = 15;
-								if (m_pCurrentFile->m_editor) {
-									m_pCurrentFile->m_editor->mScrollToCursorAddLines = -gettotop;
-									m_pCurrentFile->m_editor->mScrollToCursor = true;
-									m_pCurrentFile->m_editor->SetCursorPosition(TextEditor::Coordinates(it->second.lineno - 1, 0));
-									m_pCurrentFile->m_editor->mScrollToCursorAddLines = -gettotop;
-									m_pCurrentFile->m_editor->mScrollToCursor = true;
-								}
-								else {
-									it->second.m_InsideEditor->mScrollToCursorAddLines = -gettotop;
-									it->second.m_InsideEditor->mScrollToCursor = true;
-									it->second.m_InsideEditor->SetCursorPosition(TextEditor::Coordinates(it->second.lineno - 1, 0));
-									it->second.m_InsideEditor->mScrollToCursorAddLines = -gettotop;
-									it->second.m_InsideEditor->mScrollToCursor = true;
+										cNextWindowFocus = (char *)m_pCurrentFile->m_sEditName.GetStr();
+										bFocusActiveEditor = true;
+									}
+									//Focus.
+									int gettotop = (winsize.y / mCharAdvance.y) - 10; //-5 lines from top.
+									if (gettotop <= 0)
+										gettotop = 15;
+									if (m_pCurrentFile->m_editor) {
+										m_pCurrentFile->m_editor->mScrollToCursorAddLines = -gettotop;
+										m_pCurrentFile->m_editor->mScrollToCursor = true;
+										m_pCurrentFile->m_editor->SetCursorPosition(TextEditor::Coordinates(it->second.lineno - 1, 0));
+										m_pCurrentFile->m_editor->mScrollToCursorAddLines = -gettotop;
+										m_pCurrentFile->m_editor->mScrollToCursor = true;
+									}
+									else {
+										it->second.m_InsideEditor->mScrollToCursorAddLines = -gettotop;
+										it->second.m_InsideEditor->mScrollToCursor = true;
+										it->second.m_InsideEditor->SetCursorPosition(TextEditor::Coordinates(it->second.lineno - 1, 0));
+										it->second.m_InsideEditor->mScrollToCursorAddLines = -gettotop;
+										it->second.m_InsideEditor->mScrollToCursor = true;
+									}
 								}
 							}
 						}
 					}
-
 				}
 			}
 
@@ -4682,7 +4795,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 					it2 = symbolsList[activeSymbolslist].find(szClean.GetStr());
 				}
 				if (it2 != symbolsList[activeSymbolslist].end()) {
-					if (ImGui::MenuItem("Go To Definition")) {
+					if (ImGui::MenuItem("Go To Definition (Current File)")) {
 						if (it2->second.m_InsideEditor) {
 							//Focus.
 							int gettotop = (winsize.y / mCharAdvance.y) - 10; //-5 lines from top.
@@ -4704,7 +4817,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 
 					if (it != symbolsCollectList[iCollectListActive].end())
 					{
-						if (ImGui::MenuItem("Go To Definition")) {
+						if (ImGui::MenuItem("Go To Definition (Project)")) {
 							if (it->second.m_InsideEditor) {
 
 								cProjectItem::sProjectFiles * m_pCurrentFile;
@@ -5013,7 +5126,17 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 
 			}
 
-			if (ImGui::MenuItem("Bookmark toggle")) {
+#ifdef AGK_WINDOWS
+			
+			if (ImGui::MenuItem("Command Help")) {
+
+				BrowserHelp();
+
+			}
+			ImGui::Separator();
+#endif	
+
+			if (ImGui::MenuItem("Bookmark Toggle")) {
 				//if (bmarks.count(mState.mCursorPosition.mLine + 1) != 0)
 				if (mBookMarks.count(mState.mCursorPosition.mLine + 1) != 0)
 				{
@@ -5033,7 +5156,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			}
 
 
-			if (ImGui::MenuItem("Breakpoint toggle")) {
+			if (ImGui::MenuItem("Breakpoint Toggle")) {
 				if (bpts.count(mState.mCursorPosition.mLine + 1) != 0)
 				{
 					//Already there , remove.
@@ -5140,7 +5263,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 			}
 		}
 
-		if (ImGui::MenuItem("Read-only mode", nullptr, &ro))
+		if (ImGui::MenuItem("Read-Only Mode", nullptr, &ro))
 			SetReadOnly(ro);
 
 		ImGui::Separator();
@@ -5155,7 +5278,14 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 
 		ImGui::Separator();
 
-		if (ImGui::MenuItem("Toggle Comment Line ", "Ctrl-E", nullptr, !ro )) {
+		// New explicit comment/uncomment commands
+		if (ImGui::MenuItem("Comment Lines", pref.cCommentLinesText, nullptr, !ro)) {
+			CommentSelectedLines();
+		}
+		if (ImGui::MenuItem("Uncomment Lines", pref.cUncommentLinesText, nullptr, !ro)) {
+			UncommentSelectedLines();
+		}
+	if (ImGui::MenuItem("Toggle Comment Line ", pref.cToggleCommentText, nullptr, !ro )) {
 			ToggleLineComments();
 		}
 
@@ -5182,10 +5312,10 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 
 		ImGui::Separator();
 
-		if (ImGui::MenuItem("Select all", nullptr, nullptr))
+		if (ImGui::MenuItem("Select All", nullptr, nullptr))
 			SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(GetTotalLines(), 0));
-
-		ImGui::Separator();
+		
+			ImGui::Separator();
 
 		if (ImGui::BeginMenu("View"))
 		{
@@ -5220,7 +5350,7 @@ void TextEditor::Render(const char* aTitle, const ImVec2& aSize, bool aBorder, b
 	}
 
 
-	ImGui::PopAllowKeyboardFocus();
+	ImGui::PopItemFlag();
 	ImGui::EndChild();
 	ImGui::PopStyleVar();
 	//ImGui::PopStyleColor();
@@ -5527,31 +5657,44 @@ void TextEditor::ToggleLineComments(void)
 			if (endline > startline) {
 				mState.mCursorPosition.mLine = iloop;
 			}
-			if (line.size() >= 3) {
-				if (line[0].mChar == '/' && line[1].mChar == '/' && line[2].mChar == '~') {
-					//Remove.
-					mState.mSelectionStart = mState.mCursorPosition;
-					mState.mSelectionStart.mColumn = 0;
-					mState.mSelectionEnd = mState.mCursorPosition;
-					mState.mSelectionEnd.mColumn = 3;
-					Delete(); //PE: Changed to not use cliboard.
-				}
-				else {
-					mState.mSelectionStart = mState.mCursorPosition;
-					mState.mSelectionStart.mColumn = 0;
-					mState.mSelectionEnd = mState.mCursorPosition;
-					mState.mSelectionEnd.mColumn = 0;
-					mState.mCursorPosition.mColumn = 0;
-					char tmp[10] = "//~\0";
-					PasteString(tmp);
-				}
+			// Determine indentation (spaces/tabs) and toggle at that column
+			int indentCol = 0;
+			for (size_t j = 0; j < line.size(); ++j) {
+				char ch = line[j].mChar;
+				if (ch == ' ' || ch == '\t') indentCol++;
+				else break;
+			}
+
+			// Clamp indent within line bounds
+			if (indentCol < 0) indentCol = 0;
+			if (indentCol > (int)line.size()) indentCol = (int)line.size();
+
+			bool hasCommentAtIndent = false;
+			int delCount = 0;
+			// Only treat legacy comment marker "//~" as toggle-able. Ignore plain "//" or "// ".
+			if ((size_t)indentCol + 2 < line.size()
+				&& line[indentCol].mChar == '/'
+				&& line[indentCol + 1].mChar == '/'
+				&& line[indentCol + 2].mChar == '~') {
+				hasCommentAtIndent = true;
+				delCount = 3;
+			}
+
+			if (hasCommentAtIndent) {
+				// Remove comment prefix at indentation
+				mState.mSelectionStart = mState.mCursorPosition;
+				mState.mSelectionStart.mColumn = indentCol;
+				mState.mSelectionEnd = mState.mCursorPosition;
+				mState.mSelectionEnd.mColumn = indentCol + delCount;
+				Delete();
 			}
 			else {
+				// Insert comment at indentation
 				mState.mSelectionStart = mState.mCursorPosition;
-				mState.mSelectionStart.mColumn = 0;
+				mState.mSelectionStart.mColumn = indentCol;
 				mState.mSelectionEnd = mState.mCursorPosition;
-				mState.mSelectionEnd.mColumn = 0;
-				mState.mCursorPosition.mColumn = 0;
+				mState.mSelectionEnd.mColumn = indentCol;
+				mState.mCursorPosition.mColumn = indentCol;
 				char tmp[10] = "//~\0";
 				PasteString(tmp);
 			}
@@ -5561,6 +5704,132 @@ void TextEditor::ToggleLineComments(void)
 		mState.mSelectionStart.mLine = startline;
 		mState.mSelectionStart.mColumn = 0;
 
+		mState.mSelectionEnd.mLine = endline;
+		mState.mSelectionEnd.mColumn = mLines[endline].size();
+	}
+}
+
+void TextEditor::CommentSelectedLines(void)
+{
+	if (mLines.empty())
+		return;
+
+	int startline = mState.mCursorPosition.mLine;
+	int endline = mState.mCursorPosition.mLine;
+	bool setOldSelection = false;
+	if (HasSelection()) {
+		startline = mState.mSelectionStart.mLine;
+		endline = mState.mSelectionEnd.mLine;
+		setOldSelection = true;
+	}
+
+	for (int iloop = startline; iloop <= endline; ++iloop) {
+		auto &line = mLines[iloop];
+		if (line.empty()) continue;
+
+		if (endline > startline) {
+			mState.mCursorPosition.mLine = iloop;
+		}
+
+		// Compute indentation column
+		int indentCol = 0;
+		for (size_t j = 0; j < line.size(); ++j) {
+			char ch = line[j].mChar;
+			if (ch == ' ' || ch == '\t') indentCol++;
+			else break;
+		}
+		if (indentCol < 0) indentCol = 0;
+		if (indentCol > (int)line.size()) indentCol = (int)line.size();
+
+		// If already commented at indentation, skip
+		bool hasCommentAtIndent = false;
+		if ((size_t)indentCol + 1 < line.size() && line[indentCol].mChar == '/' && line[indentCol + 1].mChar == '/') {
+			hasCommentAtIndent = true;
+		}
+		if (!hasCommentAtIndent) {
+			mState.mSelectionStart = mState.mCursorPosition;
+			mState.mSelectionStart.mColumn = indentCol;
+			mState.mSelectionEnd = mState.mCursorPosition;
+			mState.mSelectionEnd.mColumn = indentCol;
+			mState.mCursorPosition.mColumn = indentCol;
+			char tmp[10] = "// \0";
+			PasteString(tmp);
+		}
+	}
+
+	if (setOldSelection) {
+		mState.mSelectionStart.mLine = startline;
+		mState.mSelectionStart.mColumn = 0;
+		mState.mSelectionEnd.mLine = endline;
+		mState.mSelectionEnd.mColumn = mLines[endline].size();
+	}
+}
+
+void TextEditor::UncommentSelectedLines(void)
+{
+	if (mLines.empty())
+		return;
+
+	int startline = mState.mCursorPosition.mLine;
+	int endline = mState.mCursorPosition.mLine;
+	bool setOldSelection = false;
+	if (HasSelection()) {
+		startline = mState.mSelectionStart.mLine;
+		endline = mState.mSelectionEnd.mLine;
+		setOldSelection = true;
+	}
+
+	for (int iloop = startline; iloop <= endline; ++iloop) {
+		auto &line = mLines[iloop];
+		if (line.empty()) continue;
+
+		if (endline > startline) {
+			mState.mCursorPosition.mLine = iloop;
+		}
+
+		// Compute indentation column
+		int indentCol = 0;
+		for (size_t j = 0; j < line.size(); ++j) {
+			char ch = line[j].mChar;
+			if (ch == ' ' || ch == '\t') indentCol++;
+			else break;
+		}
+		if (indentCol < 0) indentCol = 0;
+		if (indentCol > (int)line.size()) indentCol = (int)line.size();
+
+		// Check for comment at indentation and remove if present.
+		// Only remove modern plain "//" comments (optionally with a space),
+		// never remove legacy "//~" markers.
+		bool hasCommentAtIndent = false;
+		int delCount = 0;
+		if ((size_t)indentCol + 1 < line.size() && line[indentCol].mChar == '/' && line[indentCol + 1].mChar == '/') {
+			// Determine third character (if any)
+			char c3 = 0;
+			if ((size_t)indentCol + 2 < line.size()) c3 = line[indentCol + 2].mChar;
+
+			if (c3 == '~') {
+				// Do not remove legacy toggle marker
+				hasCommentAtIndent = false;
+				delCount = 0;
+			} else {
+				hasCommentAtIndent = true;
+				// Remove "// " (3) when space is present, otherwise remove just "//" (2)
+				delCount = (c3 == ' ') ? 3 : 2;
+			}
+		}
+
+		if (hasCommentAtIndent && delCount > 0) {
+			mState.mSelectionStart = mState.mCursorPosition;
+			mState.mSelectionStart.mColumn = indentCol;
+			mState.mSelectionEnd = mState.mCursorPosition;
+			mState.mSelectionEnd.mColumn = indentCol + delCount;
+			Delete();
+		}
+	}
+
+	if (setOldSelection) {
+		mState.mSelectionStart.mLine = startline;
+		mState.mSelectionStart.mColumn = 0;
 		mState.mSelectionEnd.mLine = endline;
 		mState.mSelectionEnd.mColumn = mLines[endline].size();
 	}
@@ -7174,22 +7443,41 @@ void TextEditor::Cut()
 
 void TextEditor::InsertTextDirectly(const char *text)
 {
-	auto clipText = ImGui::GetClipboardText();
-	clipText = text;
-	if (text != nullptr && strlen(text) > 0)
+	if (text == nullptr || strlen(text) == 0)
+		return;
+
+	// Snapshot current modification state; we'll only mark the file as
+	// changed if the buffer actually changes during this operation.
+	bool beforeTextChanged = mTextChanged;
+	UndoRecord u;
+	u.mBefore = mState;
+
+	// If there is an active selection, record it and delete it first so the
+	// inserted text replaces the selection (single undo entry will cover both).
+	if (HasSelection() && mState.mSelectionEnd != mState.mSelectionStart)
 	{
-		filechanged = true;
-		UndoRecord u;
-		u.mBefore = mState;
+		u.mRemoved = GetSelectedText();
+		u.mRemovedStart = mState.mSelectionStart;
+		u.mRemovedEnd = mState.mSelectionEnd;
+		// DeleteSelection will update mState and cursor position
+		DeleteSelection();
+	}
 
-		u.mAdded = text;
-		u.mAddedStart = GetActualCursorCoordinates();
+	u.mAdded = text;
+	u.mAddedStart = GetActualCursorCoordinates();
 
-		InsertText(clipText);
+	// Insert at the (possibly updated) cursor position
+	InsertText(text);
 
+	// If no actual buffer change occurred (mTextChanged unchanged), do not
+	// treat this as a file modification. This avoids marking e.g. .scene
+	// files as dirty when insertion is blocked.
+	if (mTextChanged != beforeTextChanged)
+	{
 		u.mAddedEnd = GetActualCursorCoordinates();
 		u.mAfter = mState;
 		AddUndo(u);
+		filechanged = true;
 	}
 }
 
@@ -9320,7 +9608,7 @@ float TextEditor::TextDistanceToLineStart(const Coordinates& aFrom) const
 	if (aFrom.mLine > mLines.size()) return 0.0f;
 
 	auto& line = mLines[aFrom.mLine];
-	auto fontScale = ImGui::GetFontSize() / ImGui::GetFont()->FontSize;
+	auto fontScale = ImGui::GetFontSize() / ImGui::GetFont()->LegacySize;
 	static std::string buffer;
 	float spaceSize = ImGui::CalcTextSize(" ").x + 1.0f * fontScale;
 	float distance = 0.0f;

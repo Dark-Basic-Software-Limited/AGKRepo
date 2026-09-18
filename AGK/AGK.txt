@@ -1,7 +1,87 @@
 AGK Change Log
 ==============
 
-Build Studio 2024.05.20
+
+Build Studio 2025.11.30 by Zaxxan
+---------------------------------
+
+- Update ImGui to 1.92.2b
+- Add 'Save All' to File Menu 
+- Add 'Comment Lines' and 'Uncomment Lines' to right context menu
+- Save position and size of dialogs
+- Improvement to how command examples are shown
+- Add Color Picker to Tool Menu
+- Visual improvements to Android Export and Replace dialogs
+- Android Export Error & Success messages now reported via native dialogs
+- Add short cut preference settings for Comment Lines, Uncomment and Toggle Comment Lines
+- Update ImGui memory editor from v0.33 to v0.59 (v0.33 causing preview crash with 1.92.2.b)
+- Fix issue when creating a new source file and it not displaying in Project window (Project Tree now lists alphabetically when Remember Editor Tab Order is enabled (only applies to tabs)
+- Add 16K Memory Page support for Android Apps
+- Add save Project fold\unfold state
+- Removed News server code from Studio
+- Update to Android NDK r28c
+- Update Android exports to support Vulkan
+- Android AGKPlayer now supports Vulkan
+- Add Inbuilt command examples to IDE (Added by White3)
+- Change TGC website to AppGameKit GitHub Repository
+- Fix full screen HTML5 exports
+- Fix HTML5 saves
+- Hide AGK Branding option added for HTML5 exports
+- Add Scroll Arrows and preference settings to IDE 
+- Add new Dark Blue Style to Colour Schemes in the IDE (Based on GameGuru Max theme)
+- Fix VSCode compiler bug
+- Save size and position of dialog boxes (Android and HTML5 export etc)
+- Fix bugs in Dark Grey Style and Dark Blue Style schemes
+- Fix Android library compile warnings (libprojects - changed from 16 to 21)
+- Add BreakPoint Toggle shortcut to Preferences
+- Fix AGK internal Help truncates longer Help Files ( https://github.com/Dark-Basic-Software-Limited/AGK-Studio/issues/991 )
+- Add Build Info tab to About
+- Improve multi monitor support (IDE now opens correctly on secondary monitor when full screen)
+- Update Bundletool to 1.18.1
+- Add option to open HTML5 export output folder on a successful export
+- Remove IDE Font size from View\Change Font Menu (this wasn't working correctly and there is an option in preferences to change this)
+- Fixed #constant` directives inside type definitions bug
+- Fix debugger crash when breakpoint set and hovering over array .length (White3 & Zaxxan)
+- Fix ImGUI error due to duplicate 'Go to Definition' in context menu (White3 & Zaxxan)
+- Fix CloneSprite() command so that physics default values are added
+- Fix silent crash when closing studio project using RMB
+
+Build Studio 2025.07.25 by Zaxxan
+-----------------------
+
+- Update XInput1_3.dll to XInput9_1_0.dll
+- Add Bonus Tutorials to DLC folder
+
+Build Studio 2025.06.12 by Zaxxan
+-----------------------
+
+- Update Google Billing to 7.1.1
+- Update IAP code to comply with Google Billing 7.1.1
+- Target API 35
+- Update Gradle to v8.14
+- Update AGP to 8.9.2
+- Update Tier 2 templates
+- Add missing Examples media
+- Add missing Sandbox media
+- Add missing Example Plugins
+- Minimum Android Version now 21 (was 16)
+- Updated Example Plugins VS solutions to 2022
+- Changed copyright to DarkBasicSoftwareLimited
+- Change command examples to use local versions
+
+Build Studio 2024.07.07 by Zaxxan
+-----------------------
+
+- Update billing to 6.0.1
+
+Build Studio 2024.06.09 by Zaxxan
+-----------------------
+
+- Change Hue Style option to Custom GUI Colors
+- Update Google billing to v5.2.1
+- Add browser help to context menu
+
+Build Studio 2024.05.20 by Zaxxan
 -----------------------
 
 - Target API 34

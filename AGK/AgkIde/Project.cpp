@@ -132,6 +132,10 @@ void ResetPreferences(bool resetall)
 	pref.bDisplayPreviewWindow = true;
 	pref.bDisplayAssetsBrowserWindow = true;
 
+	// Scrollbar arrows defaults
+	pref.bEnableScrollbarArrows = false;
+	pref.fScrollbarArrowStep = 3.0f;
+
 	pref.iCurrentIconSet = 2;
 
 	pref.bUseInternalMousePointer = false;
@@ -300,6 +304,12 @@ void ResetPreferences(bool resetall)
 	pref.iDebugStepKey = 121; // F10
 	strcpy(pref.cDebugStepText, "F10");
 
+	pref.bBreakPointToggleCtrl = false;
+	pref.bBreakPointToggleShift = false;
+	pref.bBreakPointToggleAlt = false;
+	pref.iBreakPointToggleKey = 120; // F9
+	strcpy(pref.cBreakPointToggleText, "F9");
+
 	pref.bDebugBringToFront = false;
 	pref.iIDEUpdateFPS = 2;
 	pref.bDebugBringAppToFront = false;
@@ -338,6 +348,28 @@ void ResetPreferences(bool resetall)
 	strcpy(pref.cDuplicateLineText, "Ctrl+D");
 #endif
 
+	// Comment lines default
+	pref.bCommentLinesCtrl = true;
+	pref.bCommentLinesShift = true;
+	pref.bCommentLinesAlt = false;
+	pref.iCommentLinesKey = 69; // E
+#ifdef AGK_MACOS
+	strcpy(pref.cCommentLinesText, "Cmd+Shift+E");
+#else
+	strcpy(pref.cCommentLinesText, "Ctrl+Shift+E");
+#endif
+
+	// Uncomment lines default
+	pref.bUncommentLinesCtrl = true;
+	pref.bUncommentLinesShift = false;
+	pref.bUncommentLinesAlt = true;
+	pref.iUncommentLinesKey = 69; // E
+#ifdef AGK_MACOS
+	strcpy(pref.cUncommentLinesText, "Cmd+Alt+E");
+#else
+	strcpy(pref.cUncommentLinesText, "Ctrl+Alt+E");
+#endif
+
 	pref.bSceneLowFloatPrecision = true;
 	pref.iSceneLowFloatPrecision = 2;
 
@@ -354,6 +386,17 @@ void ResetPreferences(bool resetall)
 	pref.iHoverSyntaxHelp = 0;
 	pref.iTabHideDropdown = 0;
 	pref.iCancelQuitDialog = 0;
+
+	// Toggle Comment Line default
+	pref.bToggleCommentCtrl = true;
+	pref.bToggleCommentShift = false;
+	pref.bToggleCommentAlt = false;
+	pref.iToggleCommentKey = 69; // E
+#ifdef AGK_MACOS
+	strcpy(pref.cToggleCommentText, "Cmd+E");
+#else
+	strcpy(pref.cToggleCommentText, "Ctrl+E");
+#endif
 	pref.iEnableCodeFolding = 0; //PE: Code Folding Beta disable code folding by default.
 
 	pref.iAndroidExportVersion = 0; // will redownload android export files
@@ -362,6 +405,10 @@ void ResetPreferences(bool resetall)
 	pref.iLastFontType = 1;
 
 	strcpy(pref.cJDKPath, "");
+
+	// HTML5 export defaults
+	pref.bHideAGKSBranding = false;
+	pref.bOpenHTML5OutputFolder = false;
 
 	//HDPI default preference settings.
 	int displaywidth = agk::GetMaxDeviceWidth();
@@ -606,6 +653,34 @@ void CheckKeyboardShortcuts(void)
 
 	}
 
+	// Comment Lines
+	key = pref.iCommentLinesKey;
+	if (!pref.bCommentLinesCtrl && !pref.bCommentLinesShift && !pref.bCommentLinesAlt && ((key >= 48 && key <= 111) || (key >= 186 && key <= 223))) {
+		pref.bCommentLinesCtrl = true; pref.bCommentLinesShift = true;
+		ktext = key_values[key];
+		ktext.ReplaceStr("KEY_", "");
+#ifdef AGK_MACOS
+		strcpy(pref.cCommentLinesText, "Cmd+Shift+");
+#else
+		strcpy(pref.cCommentLinesText, "Ctrl+Shift+");
+#endif
+		strcat(pref.cCommentLinesText, ktext.GetStr());
+	}
+
+	// Uncomment Lines
+	key = pref.iUncommentLinesKey;
+	if (!pref.bUncommentLinesCtrl && !pref.bUncommentLinesShift && !pref.bUncommentLinesAlt && ((key >= 48 && key <= 111) || (key >= 186 && key <= 223))) {
+		pref.bUncommentLinesCtrl = true; pref.bUncommentLinesAlt = true;
+		ktext = key_values[key];
+		ktext.ReplaceStr("KEY_", "");
+#ifdef AGK_MACOS
+		strcpy(pref.cUncommentLinesText, "Cmd+Alt+");
+#else
+		strcpy(pref.cUncommentLinesText, "Ctrl+Alt+");
+#endif
+		strcat(pref.cUncommentLinesText, ktext.GetStr());
+	}
+
 	key = pref.iFindNextKey;
 	if (!pref.bFindNextCtrl && !pref.bFindNextShift && !pref.bFindNextAlt && ((key >= 48 && key <= 111) || (key >= 186 && key <= 223))) {
 		pref.bFindNextCtrl = true;
@@ -654,6 +729,20 @@ void CheckKeyboardShortcuts(void)
 
 	}
 
+	// Toggle Comment Line
+	key = pref.iToggleCommentKey;
+	if (!pref.bToggleCommentCtrl && !pref.bToggleCommentShift && !pref.bToggleCommentAlt && ((key >= 48 && key <= 111) || (key >= 186 && key <= 223))) {
+		pref.bToggleCommentCtrl = true;
+		ktext = key_values[key];
+		ktext.ReplaceStr("KEY_", "");
+#ifdef AGK_MACOS
+		strcpy(pref.cToggleCommentText, "Cmd+");
+#else
+		strcpy(pref.cToggleCommentText, "Ctrl+");
+#endif
+		strcat(pref.cToggleCommentText, ktext.GetStr());
+	}
+
 
 	key = pref.iBroadCastKey;
 	if (!pref.bBroadCastCtrl && !pref.bBroadCastShift && !pref.bBroadCastAlt && ((key >= 48 && key <= 111) || (key >= 186 && key <= 223))) {
@@ -697,7 +786,12 @@ void CreateNewScene(void)
 {
 	static char scenename[MAX_PATH];
 	static char cnc_error[1024];
-	static bool create_new_scene_first_run = true;
+	// Track when the dialog was previously open so we can clear the
+	// filename field every time the dialog is newly opened.
+	static bool create_new_scene_first_run = true; // legacy flag, keep for compatibility
+	static bool add_new_scene_open = false;
+	// When true the next InputText will grab keyboard focus.
+	static bool _focus_new_scene_input = false;
 
 #ifdef AGK_WINDOWS
 	_chdir(startupFolder);
@@ -705,34 +799,48 @@ void CreateNewScene(void)
 	chdir(startupFolder);
 #endif
 
-	if (add_new_scene)
+	if (add_new_scene && !add_new_scene_open)
 	{
-		if (create_new_scene_first_run) {
-			create_new_scene_first_run = false;
-			strcpy(scenename, "");
-			strcpy(cnc_error, "");
-
-			//PE: somehow Rick got it set really small ? or off sceeen (GetMainViewport()->Pos) ? so. let imgui ImGuiWindowFlags_AlwaysAutoResize do it.
-//			ImGui::SetNextWindowPos(ImVec2(100, 100) + ImGui::GetMainViewport()->Pos, ImGuiSetCond_Once);
-//			ImGui::SetNextWindowSize(ImVec2(31 * ImGui::GetFontSize(), 8 * ImGui::GetFontSize()));
-		}
+		
+	// Dialog was just opened -> clear fields and request focus for the input.
+		strcpy(scenename, "");
+		strcpy(cnc_error, "");
+		create_new_scene_first_run = false;
+		_focus_new_scene_input = true;
 	}
+	// remember state for next frame
+	add_new_scene_open = add_new_scene;
 
 
 	if (add_new_scene)
 	{
-		ImGui::SetNextWindowPosCenter(ImGuiCond_Always); //PE: Center modal windows.
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f)); //PE: Center modal windows.
 		ImGui::SetNextWindowSize(ImVec2(31 * ImGui::GetFontSize(), 8 * ImGui::GetFontSize()));
 
-		ImGui::OpenPopup("Create New Scene.");
-		if (ImGui::BeginPopupModal("Create New Scene.", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		ImGui::OpenPopup("Create New Scene");
+		if (ImGui::BeginPopupModal("Create New Scene", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			float fIndent = 7 * ImGui::GetFontSize();
 
-			ImGui::Text("Scene name:");
+			ImGui::Text("Scene Name:");
 			ImGui::SameLine();
 			ImGui::SetCursorPos(ImVec2(fIndent, ImGui::GetCursorPos().y));
+
+			const float content_max_x = ImGui::GetWindowContentRegionMax().x;
+			const float cursor_x = ImGui::GetCursorPosX();
+			float input_width = content_max_x - cursor_x - 8.0f; //padding for right side of text box
+			if (input_width < 48.0f) input_width = 48.0f;
+			ImGui::SetNextItemWidth(input_width);
+
 			bool enterpressed = false;
+
+			// If the dialog was just opened, request keyboard focus for the next widget.
+			if (_focus_new_scene_input) {
+				ImGui::SetKeyboardFocusHere();
+				_focus_new_scene_input = false;
+			}
+			// Input receives focus when the dialog opens; keep flags minimal since the field is cleared on open.
+
 			if (ImGui::InputText("      ", &scenename[0], MAX_PATH, ImGuiInputTextFlags_EnterReturnsTrue)) {
 				enterpressed = true;
 			}
@@ -757,14 +865,14 @@ void CreateNewScene(void)
 						//Remove any file related stuff in project name.
 						newName = scenename;
 						newName.ReplaceStr(":", "");
-						newName.ReplaceStr("\\", "");
+						ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f)); //PE: Center modal windows.
 						newName.ReplaceStr("/", "");
 						newName.ReplaceStr("&", "");
 						int pos = newName.FindStr(".scene", 1);
 						if (pos <= 0) {
 							newName.Append(".scene");
 						}
-
+					ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f)); //PE: Center modal windows.
 						uString pfolder = "";
 						uString projectpath = pCurrentSelectedProject->m_sProjectFileFullPath;
 						projectpath.ReplaceStr("\\", "/");
@@ -843,12 +951,12 @@ void CreateNewScene(void)
 										m_ActiveEditor = m_pSearchFile->m_editor;
 										ImGui::SetWindowFocus(m_pSearchFile->m_sEditName.GetStr());
 
-										//Save new project settings.
-										SaveProjectFile(pCurrentSelectedProject);
-										//Done close window.
-										add_new_scene = false;
-									}
 
+									//Save new project settings.
+									SaveProjectFile(pCurrentSelectedProject, true);
+									//Done close window.
+									add_new_scene = false;
+								}
 								}
 								else sprintf(cnc_error, "Cant create file: %s.", ScenePath.GetStr());
 							}
@@ -872,7 +980,12 @@ void CreateNewProjectFile(void)
 {
 	static char newfilename[MAX_PATH];
 	static char cnc_error[1024];
-	static bool create_new_project_file_first_run = true;
+	// Track when the dialog was previously open so we can clear the
+	// filename field every time the dialog is newly opened.
+	static bool create_new_project_file_first_run = true; // legacy flag, keep for compatibility
+	static bool add_new_project_file_open = false;
+	// When true the next InputText will grab keyboard focus.
+	static bool _focus_new_project_file_input = false;
 
 #ifdef AGK_WINDOWS
 	_chdir(startupFolder);
@@ -880,31 +993,42 @@ void CreateNewProjectFile(void)
 	chdir(startupFolder);
 #endif
 
-	if (add_new_project_file)
+	if (add_new_project_file && !add_new_project_file_open)
 	{
-		if (create_new_project_file_first_run) {
-			create_new_project_file_first_run = false;
-			strcpy(newfilename, "");
-			strcpy(cnc_error, "");
-			//ImGui::SetNextWindowPos(ImVec2(100, 100) + ImGui::GetMainViewport()->Pos, ImGuiSetCond_Once);
-			//ImGui::SetNextWindowSize(ImVec2(31 * ImGui::GetFontSize(), 8 * ImGui::GetFontSize())); //PE: Always set window size.
-		}
+		// Dialog was just opened -> clear fields and request focus for the input.
+		strcpy(newfilename, "");
+		strcpy(cnc_error, "");
+		create_new_project_file_first_run = false;
+		_focus_new_project_file_input = true;
 	}
+	// remember state for next frame
+	add_new_project_file_open = add_new_project_file;
 
 	if (add_new_project_file)
 	{
-		ImGui::SetNextWindowPosCenter(ImGuiCond_Always); //PE: Center modal windows.
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f)); //PE: Center modal windows.
 		ImGui::SetNextWindowSize(ImVec2(31 * ImGui::GetFontSize(), 8 * ImGui::GetFontSize())); //PE: Always set window size.
 
-		ImGui::OpenPopup("Create New Project Source File.");
-		if (ImGui::BeginPopupModal("Create New Project Source File.", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		ImGui::OpenPopup("Create New Project Source File");
+		if (ImGui::BeginPopupModal("Create New Project Source File", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			float fIndent = 7 * ImGui::GetFontSize();
 
-			ImGui::Text("File name:");
+			ImGui::Text("File Name:");
 			ImGui::SameLine();
 			ImGui::SetCursorPos(ImVec2(fIndent, ImGui::GetCursorPos().y));
+			const float content_max_x = ImGui::GetWindowContentRegionMax().x;
+			const float cursor_x = ImGui::GetCursorPosX();
+			float input_width = content_max_x - cursor_x - 8.0f; //padding for right side of text box
+			if (input_width < 48.0f) input_width = 48.0f;
+			ImGui::SetNextItemWidth(input_width);
 			bool enterpressed = false;
+			// If the dialog was just opened, request keyboard focus for the next widget.
+			if (_focus_new_project_file_input) {
+				ImGui::SetKeyboardFocusHere();
+				_focus_new_project_file_input = false;
+			}
+			// Input receives focus when the dialog opens; keep flags minimal since the field is cleared on open.
 			if (ImGui::InputText("      ", &newfilename[0], MAX_PATH, ImGuiInputTextFlags_EnterReturnsTrue)) {
 				enterpressed = true;
 			}
@@ -1032,14 +1156,13 @@ void CreateNewProjectFile(void)
 										cNextWindowFocus = (char *)m_pSearchFile->m_sEditName.GetStr();
 										bFocusActiveEditor = true;
 										m_ActiveEditor = m_pSearchFile->m_editor;
-										ImGui::SetWindowFocus(m_pSearchFile->m_sEditName.GetStr());
+									ImGui::SetWindowFocus(m_pSearchFile->m_sEditName.GetStr());
 
-										//Save new project settings.
-										SaveProjectFile(pCurrentSelectedProject);
-										//Done close window.
-										add_new_project_file = false;
-									}
-
+									//Save new project settings.
+									SaveProjectFile(pCurrentSelectedProject, true);
+									//Done close window.
+									add_new_project_file = false;
+								}
 								}
 								else sprintf(cnc_error, "Cant create file: %s.", ScenePath.GetStr());
 							}
@@ -1083,25 +1206,41 @@ void CreateNewProject( void )
 			if( strlen(pref.cDefaultProjectFolder) > 1 )
 			strcpy(projectfolder, pref.cDefaultProjectFolder);
 			strcpy(cnp_error, "");
-			//ImGui::SetNextWindowPos(ImVec2(100, 100) + ImGui::GetMainViewport()->Pos, ImGuiSetCond_Once);
+			//ImGui::SetNextWindowPos(ImVec2(100, 100) + ImGui::GetMainViewport()->Pos, ImGuiCond_Once);
 			//ImGui::SetNextWindowSize(ImVec2(33 * ImGui::GetFontSize(), 10 * ImGui::GetFontSize())); //PE: Always set window size.
 		}
 	}
 
 	if (create_new_project)
 	{
-		ImGui::SetNextWindowPosCenter(ImGuiCond_Always); //PE: Center modal windows.
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f)); //PE: Center modal windows.
 		ImGui::SetNextWindowSize(ImVec2(33 * ImGui::GetFontSize(), 10 * ImGui::GetFontSize())); //PE: Always set window size.
 
-		ImGui::OpenPopup("Create New Project.");
-		if (ImGui::BeginPopupModal("Create New Project.", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		ImGui::OpenPopup("Create New Project");
+		if (ImGui::BeginPopupModal("Create New Project", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			float fIndent = 7 * ImGui::GetFontSize();
 			ImGui::Text("Project name:");
 			ImGui::SameLine();
 			ImGui::SetCursorPos(ImVec2(fIndent, ImGui::GetCursorPos().y));
-			if (ImGui::InputText("      ", &projectname[0], MAX_PATH, 0)) { //ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue
-			
+
+			// Determine widths based on the dialog's content region so inputs scale with the dialog.
+			ImGuiStyle &style = ImGui::GetStyle();
+			const float content_max_x = ImGui::GetWindowContentRegionMax().x; // right edge inside content region
+			const float cursor_x = ImGui::GetCursorPosX(); // x position where input will start (fIndent)
+			const float item_spacing = style.ItemSpacing.x;
+			const float frame_pad_x = style.FramePadding.x;
+			const float right_margin = frame_pad_x * 2.0f; // desired distance from button to right edge
+			const float btn_text_w = ImGui::CalcTextSize("...").x;
+			const float btn_w = btn_text_w + frame_pad_x * 2.0f;
+
+			// Compute input width so that: input + spacing + button + right_margin == available width
+			float inputW = content_max_x - cursor_x - item_spacing - btn_w - right_margin;
+			if (inputW < 48.0f) inputW = 48.0f; // guard minimum width
+
+			ImGui::PushItemWidth(inputW);
+			if (ImGui::InputText("##projectname", &projectname[0], MAX_PATH, 0)) { //ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue
+
 				if (strlen(pref.cDefaultProjectFolder) > 1) {
 					if (strncmp(pref.cDefaultProjectFolder, projectfolder, strlen(pref.cDefaultProjectFolder)) == 0) {
 
@@ -1120,11 +1259,21 @@ void CreateNewProject( void )
 					}
 				}
 			}
+			ImGui::PopItemWidth();
+
 			ImGui::Text("Folder:");
 			ImGui::SameLine();
 			ImGui::SetCursorPos(ImVec2(fIndent, ImGui::GetCursorPos().y));
-			ImGui::InputText("  ", &projectfolder[0], MAX_PATH, 0); //ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue
+
+			// Reuse the same input width for the folder field so they look balanced.
+			ImGui::PushItemWidth(inputW);
+			ImGui::InputText("##projectfolder", &projectfolder[0], MAX_PATH, 0); //ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_EnterReturnsTrue
+			ImGui::PopItemWidth();
+
+			// Place the "..." button at a fixed distance from the right hand side of the dialog.
 			ImGui::SameLine();
+			const float button_pos_x = content_max_x - right_margin - btn_w;
+			ImGui::SetCursorPosX(button_pos_x);
 			if (ImGui::Button("...")) {
 				char *selectedfolder;
 //				selectedfolder = (char *)noc_file_dialog_open(NOC_FILE_DIALOG_DIR, "agk\0*.agk\0", NULL, NULL);
@@ -1563,6 +1712,10 @@ void CloseAllOpenProjectEditedFiles(void)
 						m_pSearchFile->m_editor->filechanged = false;
 #endif
 					}
+					else {
+						// User chose not to save in native dialog; clear changed flag so ImGui doesn't prompt again
+						m_pSearchFile->m_editor->filechanged = false;
+					}
 				}
 
 				if (m_pSearchFile->m_bOpenForEdit && m_pSearchFile->m_editor && m_pSearchFile->m_editor->bEditorVisible )
@@ -1596,6 +1749,10 @@ void SaveAllOpenProjectEditedFiles(void)
 						//Save changes
 						m_pSearchFile->m_scene->GenerateCode(m_pSearchFile->m_scene, m_pSearchFile->m_editor,true);
 					}
+					else {
+						// User chose not to save in native dialog; clear changed flag so ImGui won't prompt later
+						m_pSearchFile->m_editor->filechanged = false;
+					}
 				}
 				else if (m_pSearchFile->m_bOpenForEdit && m_pSearchFile->m_editor && m_pSearchFile->m_editor->filechanged && m_pSearchFile->m_editor->bEditorVisible ) {
 
@@ -1612,6 +1769,10 @@ void SaveAllOpenProjectEditedFiles(void)
 						myfile.close();
 						m_pSearchFile->m_editor->filechanged = false;
 #endif
+					}
+					else {
+						// User chose not to save in native dialog; clear changed flag so ImGui won't prompt later
+						m_pSearchFile->m_editor->filechanged = false;
 					}
 				}
 				m_pSearchFile = m_pSearchFile->m_pNext;
@@ -2679,6 +2840,8 @@ void InitBroadcaster(void)
 }
 
 int screenWidth = 0, screenHeight = 0;
+int WindowPosX = 0, WindowPosY = 0; // Global variables for window position
+int WindowMaximized = 0; // Track if window was maximized
 void LoadAgkIdeIni(int initPart)
 {
 	FILE *fp;
@@ -2686,7 +2849,6 @@ void LoadAgkIdeIni(int initPart)
 	char fpReadLine[MAX_PATH];
 	char cIniFile[MAX_PATH];
 	strcpy(activeproject, "");
-	int WindowPosX=0, WindowPosY=0;
 	sprintf(cIniFile, "%sagkide.ini", defaultWriteFolder);
 	fp = fopen(cIniFile, "r");
 	if (!fp)
@@ -2715,18 +2877,17 @@ void LoadAgkIdeIni(int initPart)
 					if (fgets(&fpReadLine[0], MAX_PATH, fp))
 						WindowPosY = atoi(fpReadLine);
 				}
+				if (strncmp(fpReadLine, "agkmaximized:", 12) == 0) {
+					if (fgets(&fpReadLine[0], MAX_PATH, fp))
+						WindowMaximized = atoi(fpReadLine);
+				}
 
 				
 
 #ifdef AGK_WINDOWS
 				if (initPart >= 2) {
-					if (strncmp(fpReadLine, "agkmaximized:", 12) == 0) {
-						if (fgets(&fpReadLine[0], MAX_PATH, fp)) {
-							int iMaximize = atoi(fpReadLine);
-							if(iMaximize == 1)
-								ShowWindow(g_agkhWnd, SW_MAXIMIZE);
-						}
-					}
+					if (WindowMaximized == 1)
+						ShowWindow(g_agkhWnd, SW_MAXIMIZE);
 				}
 #endif
 
@@ -2879,19 +3040,10 @@ void LoadAgkIdeIni(int initPart)
 			agk::SetWindowSize(screenWidth, screenHeight, agkfullscreen);
 
 	}
-	if (initPart == 2 && (WindowPosY != 0 || WindowPosX != 0)) {
-
-		//PE: When restoring and "minimized" , offset is way off and window was hidden.
-		if (WindowPosX < -screenWidth && WindowPosY < -screenHeight)
-		{
-			//just ignore agk has already centered the window.
-//			WindowPosX = 0;
-//			WindowPosY = 0;
-//			agk::SetWindowPosition(WindowPosX, WindowPosY);
-		}
-		else
-			agk::SetWindowPosition(WindowPosX, WindowPosY);
-	}
+	
+	// Window position is now applied in Ide.cpp::app::Begin() after LoadAgkIdeIni(1)
+	// This ensures the window appears at the correct position on the correct monitor
+	// from the very beginning, avoiding the "title bar only" issue on secondary monitors
 
 	if (initPart == 1) {
 		//Also load preferences.
@@ -2915,6 +3067,40 @@ void LoadAgkIdeIni(int initPart)
 		}
 		//Dont start it as open.
 		pref.show_preferences_window = false;
+
+		// Ensure a sensible default project folder on first run or when unset
+		if (pref.cDefaultProjectFolder[0] == '\0')
+		{
+			char *docs = agk::GetDocumentsPath();
+			if (docs && *docs)
+			{
+				uString nfolder = docs;
+				// Normalize separators
+				nfolder.ReplaceStr("\\", "/");
+				// Ensure trailing slash
+				if (nfolder.GetLength() > 0)
+				{
+					char last = nfolder.GetStr()[ nfolder.GetLength()-1 ];
+					if ( last != '/' && last != '\\' ) nfolder.Append("/");
+				}
+				nfolder.Append("AGK Projects");
+				// Assign
+				strcpy(pref.cDefaultProjectFolder, nfolder.GetStr());
+
+				// Optionally create the folder if it doesn't exist (best-effort)
+				struct stat sb; // requires <sys/stat.h> which is already included at top of this file
+				uString mkpath = nfolder; // keep normalized
+				const char *cpath = mkpath.GetStr();
+				if (stat(cpath, &sb) != 0)
+				{
+#ifdef AGK_WINDOWS
+					_mkdir(cpath);
+#else
+					mkdir(cpath, S_IRWXU | S_IRWXG | S_IRWXO);
+#endif
+				}
+			}
+		}
 
 		CheckKeyboardShortcuts();
 	}
@@ -2992,6 +3178,13 @@ void SaveAgkIdeIni(void)
 		fputs(cWriteLine, fp);
 
 #ifdef AGK_WINDOWS
+		// Use GetWindowPlacement instead of GetWindowRect to get the correct position
+		// even when window is minimized or maximized
+		WINDOWPLACEMENT wp;
+		wp.length = sizeof(WINDOWPLACEMENT);
+		GetWindowPlacement(g_agkhWnd, &wp);
+		
+		// Save whether window is maximized
 		if (IsZoomed(g_agkhWnd)) {
 			sprintf(cWriteLine, "agkmaximized:\n%d\n", 1);
 			fputs(cWriteLine, fp);
@@ -3000,15 +3193,12 @@ void SaveAgkIdeIni(void)
 			sprintf(cWriteLine, "agkmaximized:\n%d\n", 0);
 			fputs(cWriteLine, fp);
 		}
-#endif
-
-#ifdef AGK_WINDOWS
-		RECT rect = { NULL };
-		GetWindowRect(g_agkhWnd, &rect);
-
-		sprintf(cWriteLine, "WindowPosX:\n%d\n", rect.left);
+		
+		// Save the normal (non-minimized, non-maximized) window position
+		// Use rcNormalPosition which contains the window's position when in normal state
+		sprintf(cWriteLine, "WindowPosX:\n%d\n", wp.rcNormalPosition.left);
 		fputs(cWriteLine, fp);
-		sprintf(cWriteLine, "WindowPosY:\n%d\n", rect.top);
+		sprintf(cWriteLine, "WindowPosY:\n%d\n", wp.rcNormalPosition.top);
 		fputs(cWriteLine, fp);
 #endif
 #ifdef AGK_MACOS
@@ -3461,7 +3651,7 @@ void LoadAgkProjectFile(char *file)
 	}
 }
 
-void SaveProjectFile(cProjectItem * mProject)
+void SaveProjectFile(cProjectItem * mProject, bool bSkipSorting)
 {
 	cProjectItem * searchProject;
 	cProjectItem::sProjectFiles * saveProjectFiles;
@@ -3498,21 +3688,27 @@ void SaveProjectFile(cProjectItem * mProject)
 				bool bWatchVariablesSaved = false;
 				bool bHTMLSaved = false;
 				bool bAPKSaved = false;
-				bool bIPASaved = false;
-				bool bOpenFilesSaved = false;
+			bool bIPASaved = false;
+			bool bOpenFilesSaved = false;
+			bool bProjectSaved = false;
 
-				if (pref.iRememberTabOrder)
-				{
-					//Sort saveProjectFiles = searchProject->m_pFirstFile; by tab order.
-					void sort_project_files_order(cProjectItem * searchProject);
-					sort_project_files_order(searchProject);
-					saveProjectFiles = searchProject->m_pFirstFile;
-				}
+			if (pref.iRememberTabOrder && !bSkipSorting)
+			{
+				//Sort saveProjectFiles = searchProject->m_pFirstFile; by tab order.
+				void sort_project_files_order(cProjectItem * searchProject);
+				sort_project_files_order(searchProject);
+				saveProjectFiles = searchProject->m_pFirstFile;
+			}
+			else
+			{
+				//Sort alphabetically when adding new files OR when tab order is not being remembered
+				void sort_project_files_alphabetically(cProjectItem * searchProject);
+				sort_project_files_alphabetically(searchProject);
+				saveProjectFiles = searchProject->m_pFirstFile;
+			}
 
 
-				for (int i = 0; i < iAgkProjectFiles; i++) {
-
-					sSaveAgkProjectFiles[iSaveAgkProjectFiles] = sAgkProjectFiles[i];
+			for (int i = 0; i < iAgkProjectFiles; i++) {					sSaveAgkProjectFiles[iSaveAgkProjectFiles] = sAgkProjectFiles[i];
 
 					if ( strstr( sAgkProjectFiles[i].GetStr() , "[projectfiles]")  ) {
 						//Find next section.
@@ -3827,6 +4023,18 @@ void SaveProjectFile(cProjectItem * mProject)
 						sSaveAgkProjectFiles[iSaveAgkProjectFiles++] = "\n";
 						bOpenFilesSaved = true;
 					}
+					else if (strstr(sAgkProjectFiles[i].GetStr(), "[project]")) {
+						// Find next section.
+						while (++i < iAgkProjectFiles && sAgkProjectFiles[i][0] != '[');
+						if (i < iAgkProjectFiles)
+							i--;
+						iSaveAgkProjectFiles++; // Keep []
+						char textdest[2048];
+						sprintf(textdest, "unfolded=%d\n", searchProject->m_bDisplayUnfolded ? 1 : 0);
+						sSaveAgkProjectFiles[iSaveAgkProjectFiles++] = textdest;
+						sSaveAgkProjectFiles[iSaveAgkProjectFiles++] = "\n";
+						bProjectSaved = true;
+					}
 					else {
 						iSaveAgkProjectFiles++;
 					}
@@ -3883,6 +4091,16 @@ void SaveProjectFile(cProjectItem * mProject)
 					bWatchVariablesSaved = true;
 
 				}
+
+				if (!bProjectSaved) {
+					//Create new [project] section.
+					sSaveAgkProjectFiles[iSaveAgkProjectFiles++] = "\n[project]\n";
+					char textdest[2048];
+					sprintf(textdest, "unfolded=%d\n", searchProject->m_bDisplayUnfolded ? 1 : 0);
+					sSaveAgkProjectFiles[iSaveAgkProjectFiles++] = textdest;
+					sSaveAgkProjectFiles[iSaveAgkProjectFiles++] = "\n";
+				}
+
 				SaveAgkProjectFile((char *)m_szParse.GetStr());
 
 			}
@@ -3996,7 +4214,6 @@ void LoadProjectFile( char * cFileSelected)
 	nextProject->m_pFirstFile = NULL;
 	nextProject->m_pMediaFolder = NULL;
 	nextProject->m_bDisplayUnfolded = true;
-	nextProject->m_bDisplayCollapsed = false;
 	nextProject->m_pNext = NULL;
 
 	pCurrentSelectedProject = nextProject;
@@ -4050,6 +4267,9 @@ void LoadProjectFile( char * cFileSelected)
 	pCurrentSelectedProject->html_dynamic_memory = 0;
 
 	int inSection = 0;
+	// Ensure we only set focus once to the first FILE_NAME_* line with active flag (=1)
+	bool bActiveTabFocusSet = false;
+	cProjectItem::sProjectFiles* pActiveFileToFocus = NULL;
 	cProjectItem::sProjectFiles * m_pCurrentFile, *m_pSearchFile, *m_pSortedFile, *m_ptmpFile;
 	m_pCurrentFile = NULL;
 
@@ -4088,6 +4308,9 @@ void LoadProjectFile( char * cFileSelected)
 				}
 				if (strncmp(m_szCommand.GetStr(), "[projectfiles]", 14) == 0) {
 					inSection = 6;
+				}
+				if (strncmp(m_szCommand.GetStr(), "[project]", 9) == 0) {
+					inSection = 7;
 				}
 
 				m_szCommand = "";
@@ -4297,6 +4520,16 @@ void LoadProjectFile( char * cFileSelected)
 						}
 					}
 
+					if (inSection == 7) {
+						m_szRest.ReplaceStr("\n", "");
+						m_szRest.ReplaceStr("\r", "");
+
+						if (strncmp(m_szCommand.GetStr(), "unfolded", 8) == 0) {
+							m_szRest.ReplaceStr("\\\\", "\\"); m_szRest.ReplaceStr("\n", "");
+							pCurrentSelectedProject->m_bDisplayUnfolded = atoi(m_szRest.GetStr()) != 0;
+						}
+					}
+
 					m_szCommand.SubString(m_szLeft, 0, 5);
 					//WATCH_VARIABLE:
 					if (strncmp(m_szCommand.GetStr(), "watch_variable", 14) == 0) {
@@ -4347,11 +4580,13 @@ void LoadProjectFile( char * cFileSelected)
 											bool vTextEditor(char *winname, TextEditor * m_editor, char * cName, char * cPath, bool bUseSaveAs = false, cProjectItem::sProjectFiles * m_pCurFile = NULL);
 											vTextEditor((char *)m_pSearchFile->m_sEditName.GetStr(), m_pSearchFile->m_editor, (char*)m_pSearchFile->m_sName.GetStr(), (char*)m_pSearchFile->m_sFullPath.GetStr(), m_pSearchFile->m_bUseSaveAs);
 										}
+										// When tab order is not remembered, avoid creating/docking the window here,
+										// so alphabetical sorting below can determine the final tab order.
 
-										if (bOpenWithFocus) {
-											cNextWindowFocus = (char *)m_pSearchFile->m_sEditName.GetStr();
-											m_ActiveEditor = m_pSearchFile->m_editor;
-											bFocusActiveEditor = true;
+										if (bOpenWithFocus && !bActiveTabFocusSet) {
+											// Defer setting UI focus until after any list reordering to avoid race conditions
+											pActiveFileToFocus = m_pSearchFile;
+											bActiveTabFocusSet = true;
 										}
 
 										if (gotoline > 0) {
@@ -4490,9 +4725,10 @@ void LoadProjectFile( char * cFileSelected)
 		fclose(fp);
 
 
+		// When tab order is NOT remembered, sort the file list alphabetically
+		// When tab order IS remembered, keep files in the order from the file (tab order)
 		if (!pref.iRememberTabOrder)
 		{
-			//Sort files inside project.
 			if (sorted_project_files.size() >= 1) {
 
 				m_pSortedFile = NULL;
@@ -4542,9 +4778,16 @@ void LoadProjectFile( char * cFileSelected)
 				}
 
 			}
-			//agk::Print("");
-			sorted_project_files.clear();
 		}
+		// After any reordering, set focus to the deferred active file (if any)
+		if (pActiveFileToFocus) {
+			cNextWindowFocus = (char*)pActiveFileToFocus->m_sEditName.GetStr();
+			m_ActiveEditor = pActiveFileToFocus->m_editor;
+			bFocusActiveEditor = true;
+		}
+
+		//agk::Print("");
+		sorted_project_files.clear();
 
 	}
 

@@ -303,61 +303,10 @@ int main( int argc, char* argv[] )
 	LPSTR pUserName = getenv("USERNAMEFORAGK");
 	if (pUserName)
 	{
-		sprintf(szAPKSigner, "C:\\Users\\%s\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\lib\\apksigner.jar", pUserName);
-		sprintf(szZipAlign, "C:\\Users\\%s\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\zipalign.exe", pUserName);
+		sprintf(szAPKSigner, "C:\\Users\\%s\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\lib\\apksigner.jar", pUserName);
+		sprintf(szZipAlign, "C:\\Users\\%s\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\zipalign.exe", pUserName);
 		sprintf(szGradleRes, "C:\\Users\\%s\\.gradle", pUserName);
 	}
-
-	/* old method using absolute paths per developer
-	// set some path variables
-	#if defined(MIKE_BUILD)
-	// mike - 110621 - an option for the future is to modify the app so that you select a text file
-	// when it launches that contains all of the relevant paths
-	//const char* szVisualStudio = "D:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\Common7\\IDE\\devenv.exe"; // can be any version as long as it has platform tools v140 installed
-	const char* szVS2015 = "D:\\Program Files (x86)\\Microsoft Visual Studio 14.0\\Common7\\IDE\\devenv.exe";
-	const char* szVS2017 = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\Common7\\IDE\\devenv.exe";
-    const char* szDstFolderWin = "D:\\AGK_Build\\Builds\\Studio\\AGKStudioWindows";
-	const char* szDstFolderMac = "D:\\AGK_Build\\Builds\\Studio\\AGKStudioMac\\AGK";
-	const char* szDstFolderLinux = "D:\\AGK_Build\\Builds\\Studio\\AGKStudioLinux\\AGK";
-	const char* szDstFolderWinTrial = "D:\\AGK_Build\\Builds\\Studio\\AGKStudioWindowsTrial";
-	//const char* szSharedFolder = "D:\\AGK\\Shared"; // for Mac and Linux access
-	const char* szSharedFolder = "D:\\AGK_Build\\Shared\\WindowsReceive"; // for Mac and Linux access
-	//const char* szZipAlign = "D:\\Projects\\Android\\SDK\\build-tools\\31.0.0\\zipalign.exe";
-	//const char* szAPKSigner = "D:\\Projects\\Android\\SDK\\build-tools\\31.0.0\\lib\\apksigner.jar";
-	//const char* szJarSigner = "D:\\Projects\\Android\\Java\\bin\\jarsigner.exe";
-	const char* szJarSigner = "E:\\AndroidStudio\\jre\\bin\\jarsigner.exe";
-	const char* szKeyStore = "D:\\AGK_Build\\Signing\\keystore.keystore";
-	const char* szTemp = "D:\\AGK_Build\\Temp";
-	//const char* szGradleRes = "D:\\Documents\\.gradle";
-	const char* szGradleRes = "C:\\Users\\Mike\\.gradle";
-	//const char* szJava = "d:\\Projects\\Java\\jdk-11\\bin\\java.exe";
-	const char* szVisualStudio = "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\devenv.exe"; // can be any version as long as it has platform tools v140 installed	
-	const char* szJava = "C:\\Program Files\\Java\\jdk-17.0.2\\bin\\java.exe";
-	const char* szTortoiseSVN = "C:\\Program Files\\TortoiseSVN\\bin\\TortoiseProc.exe";
-	const char* szAPKSigner = "C:\\Users\\Mike\\AppData\\Local\\Android\\Sdk\\build-tools\\31.0.0\\lib\\apksigner.jar";
-	const char* szZipAlign = "C:\\Users\\Mike\\AppData\\Local\\Android\\Sdk\\build-tools\\31.0.0\\zipalign.exe";
-	//SetCurrentDirectoryWithCheck ( "D:\\AGK\\Studio" ); // AGKTrunk
-	SetCurrentDirectoryWithCheck ("D:\\AGK\\"); // AGKTrunk
-	#elif defined(PAUL_BUILD)
-	const char* szVisualStudio = "C:\\Programs\\Visual Studio 2022\\Common7\\IDE\\devenv.exe"; // can be any version as long as it has platform tools v140 installed
-	const char* szDstFolderWin = "C:\\TGC\\AGKStudioBuild\\AGKStudioWindows";
-	const char* szDstFolderMac = "C:\\TGC\\AGKStudioBuild\\AGKStudioMac\\AGK";
-	const char* szDstFolderLinux = "C:\\TGC\\AGKStudioBuild\\AGKStudioLinux\\AGK";
-	const char* szDstFolderWinTrial = "C:\\TGC\\AGKStudioBuild\\AGKStudioWindowsTrial";
-	const char* szSharedFolder = "E:\\Receive"; // for Mac and Linux access
-	const char* szTortoiseSVN = "C:\\Programs\\TortoiseSVN\\bin\\TortoiseProc.exe";
-	const char* szZipAlign = "E:\\Data\\AndroidSDK\\build-tools\\31.0.0\\zipalign.exe";
-	const char* szAPKSigner = "E:\\Data\\AndroidSDK\\build-tools\\31.0.0\\lib\\apksigner.jar";
-	const char* szJarSigner = "C:\\Programs\\jdk-11.0.15.1\\bin\\jarsigner.exe";
-	const char* szJava = "C:\\Programs\\jdk-11.0.15.1\\bin\\java.exe";
-	const char* szKeyStore = "C:\\Paul\\TGC\\keystore\\keystore.keystore";
-	const char* szTemp = "E:\\Temp";
-	const char* szGradleRes = "C:\\Users\\PSJoh\\.gradle";
-	SetCurrentDirectoryWithCheck ( "..\\..\\..\\.." ); // AGKTrunk
-	#else
-	#error No build user defined, add the Visual Studio User Macro $(BUILD_USER)
-	#endif
-	*/
 
 	char rootFolder[ 1024 ];
 	GetCurrentDirectory( 1024, rootFolder );
@@ -419,15 +368,6 @@ startPoint:
 
 	int indexCheck = 0;
 
-	// Update SVN
-	if ( !bListCommands )
-	{
-		//int status = 0;
-		//status = RunCmd( indexCheck, szTortoiseSVN, "/command:update /path:\".\" /closeonend:3" );
-		//if ( status != 0 ) Error( "Failed" );
-		//else Message( "  Success" );
-	}
-	
 	// What's new file
 	if ( index <= ++indexCheck )
 	{
@@ -777,9 +717,9 @@ startPoint:
 				SetCurrentDirectoryWithCheck( path );
 				
 				// delete old gradle execution log
-				DeleteFile( ".gradle\\8.0\\executionHistory\\executionHistory.bin" );
-				DeleteFile( ".gradle\\8.0\\executionHistory\\executionHistory.lock" );
-				FILE* pFile = fopen( ".gradle\\8.0\\executionHistory\\executionHistory.bin", "rb" );
+				DeleteFile( ".gradle\\8.14\\executionHistory\\executionHistory.bin" );
+				DeleteFile( ".gradle\\8.14\\executionHistory\\executionHistory.lock" );
+				FILE* pFile = fopen( ".gradle\\8.14\\executionHistory\\executionHistory.bin", "rb" );
 				if ( pFile ) 
 				{
 					fclose( pFile );
@@ -883,7 +823,7 @@ startPoint:
 				strcpy( srcFolder, rootFolder );
 				strcat( srcFolder, "\\apps\\" );
 				strcat( srcFolder, szAndroidProjects[i] );
-				strcat( srcFolder, "\\AGKPlayer2\\build\\intermediates\\merged_manifest\\release\\AndroidManifest.xml" );
+				strcat( srcFolder, "\\AGKPlayer2\\build\\intermediates\\merged_manifest\\release\\processReleaseMainManifest\\AndroidManifest.xml" );
 				unsigned char* manifestData = 0;
 				size_t length = GetFileContents( srcFolder, (char**)&manifestData );
 				if ( length == 0 ) Error( "Failed to open merged AndroidManifest.xml" );
@@ -905,7 +845,7 @@ startPoint:
 				strcpy( srcFolder, rootFolder );
 				strcat( srcFolder, "\\apps\\" );
 				strcat( srcFolder, szAndroidProjects[i] );
-				strcat( srcFolder, "\\AGKPlayer2\\build\\intermediates\\merged_res\\release" );
+				strcat( srcFolder, "\\AGKPlayer2\\build\\intermediates\\merged_res\\release\\mergeReleaseResources" );
 				
 				strcpy( dstFolder, szAndroidBuildPath[i] );
 				strcat( dstFolder, szAndroidIDEFolders[i] );
@@ -918,14 +858,14 @@ startPoint:
 				// collect gradle resources
 				strcpy( srcFolder, "apps\\" ); 
 				strcat( srcFolder, szAndroidProjects[i] );
-				strcat( srcFolder, "\\.gradle\\8.0\\executionHistory\\executionHistory.bin" );
+				strcat( srcFolder, "\\.gradle\\8.14\\executionHistory\\executionHistory.bin" );
 				unsigned char* data = 0;
 				length = GetFileContents( srcFolder, (char**) &data );
 				if ( length == 0 ) Error( "Failed to open executionHistory.bin" );
 
 				int count = 0;
 				unsigned char* ptr = data;
-				const char* find = "caches\\transforms";
+				const char* find = "caches\\8.14\\transforms";
 				int findLen = (int) strlen( find );
 				while( ptr < (data + length - findLen - 1) )
 				{
@@ -965,7 +905,7 @@ startPoint:
 				for( int i = 0; i < g_allResources.m_iCount; i++ )
 				{
 					strcpy( srcFolder, szGradleRes );
-					strcat( srcFolder, "\\caches\\transforms" );
+					strcat( srcFolder, "\\caches\\8.14\\transforms" );
 					strcat( srcFolder, g_allResources.m_pData[ i ]->m_pString );
 
 					char* slash = strrchr( g_allResources.m_pData[ i ]->m_pString, '\\' );
@@ -1191,7 +1131,7 @@ startPoint:
 
 			Message( "Copying help files to Windows Trial build" );
 
-			// copy to Windows build
+			// copy to Windows Trial build
 			strcpy( srcFolder, szSharedFolder ); strcat( srcFolder, "\\Studio\\Help" );
 			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\media\\Help" );
 			DeleteFolder( dstFolder );
@@ -1280,7 +1220,7 @@ startPoint:
 				strcat( dstFolder, "\\apps" );
 
 				// MIKE - HAD TO COMMENT THIS OUT - IT TRIES TO FIND FILES THAT ARE NO LONGER RELEVANT
-				//UpdateFolder( srcFolder, dstFolder );
+				UpdateFolder( srcFolder, dstFolder );
 				
 				// update common folder
 				Message( "    Copying common folder" );
@@ -1320,13 +1260,14 @@ startPoint:
 				strcat( dstFolder, "\\platform" );
 				UpdateFolder( srcFolder, dstFolder );
 
-				// example plugin
+				// copy example plugin
 				Message( "    Copying Example Plugin folder" );
 				strcpy( srcFolder, rootFolder ); strcat( srcFolder, "\\plugins\\Source" );
 				strcpy( dstFolder, szBuildFolder[b] ); strcat( dstFolder, "\\Example Plugin" );
-				UpdateFolder( srcFolder, dstFolder );
-				strcat( dstFolder, "\\Commands.txt" );
-				CopyFile2( "plugins\\Plugins\\ExamplePlugin\\Commands.txt", dstFolder );
+				CopyFolder(srcFolder, dstFolder);
+				//UpdateFolder( srcFolder, dstFolder );
+				//strcat( dstFolder, "\\Commands.txt" );
+				//CopyFile2( "plugins\\Plugins\\ExamplePlugin\\Commands.txt", dstFolder );
 
 				Message( "  Copying Windows and Android players" );
 				strcpy( dstFolder, szBuildFolder[b] ); strcat( dstFolder, "\\Players\\Windows\\Windows64.exe" );
@@ -1399,8 +1340,8 @@ startPoint:
 		if ( bListCommands ) Message1( "%d: Copy shared files from other platforms", indexCheck );
 		else
 		{
-			if ( bSingleCommand )
-			{
+			//if ( bSingleCommand )  removed as only building for windows
+			//{
 				char srcFolder[ 1024 ];
 				char dstFolder[ 1024 ];
 			
@@ -1422,7 +1363,7 @@ startPoint:
 				CopyFile2( srcFolder, dstFolder );
 
 				if ( bSingleCommand ) goto endPoint;
-			}
+			//}
 		}
 	}
 
@@ -1432,11 +1373,6 @@ startPoint:
 		goto startPoint;
 	}
 
-	// Commit SVN
-	//int status = 0;
-	//Message( "Comitting SVN" );
-	//status = RunCmd( indexCheck, szTortoiseSVN, "/command:commit /path:\".\"" );
-	
 endPoint:
 	system("pause");
 	return 0;

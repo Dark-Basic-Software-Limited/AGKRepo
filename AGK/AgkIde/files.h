@@ -59,6 +59,7 @@ int read_buffers(char *out_buffer, int out_length, char *err_buffer, int err_len
 int write_buffers(char *out_buffer, int out_length);
 bool file_exists(const char * file);
 char * read_eula(void);
+char* read_buildinfo(void);
 char * g_file_get_contents(char *file, char *contents, int *length, char *unknown);
 bool CopyDirTo(const char *source_folder, const char *target_folder);
 uString GetGameGuruFolder(void);

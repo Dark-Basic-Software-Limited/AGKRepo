@@ -12,15 +12,28 @@
 
 int main( int argc, char* argv[] )
 {
-	// set some path variables
-	const char* szVS2015 = "C:\\Programs\\Visual Studio 14.0\\Common7\\IDE\\devenv.exe";
-	//const char* szVS2017 = "E:\\Programs\\Visual Studio 2017\\Common7\\IDE\\devenv.exe";
-	const char* szDstFolderWinTrial = "C:\\TGC\\AGKStudioBuild\\AGKStudioWindowsTrial";
-	const char* szSharedFolder = "E:\\Receive";
-	const char* szTortoiseSVN = "C:\\Programs\\TortoiseSVN\\bin\\TortoiseProc.exe";
-	const char* szTemp = "E:\\Temp";
+	
+	// prepare for relative pathing
+	char szBuildToolStartDir[1024];
+	GetCurrentDirectory(1024, szBuildToolStartDir); // D:\DEV\AGKREPO\AGK\tools\AGKBuildSystem\WindowsTrial\Final
+	char szRepoRoot[1024];
+	strcpy(szRepoRoot, szBuildToolStartDir);
+	strcat(szRepoRoot, "\\..\\..\\..\\..\\..\\");
+	SetCurrentDirectory(szRepoRoot);
+	GetCurrentDirectory(1024, szRepoRoot);
+	char szAGKTrunkDir[1024];
+	sprintf(szAGKTrunkDir, "%s\\AGK\\", szRepoRoot);
+	SetCurrentDirectoryWithCheck(szAGKTrunkDir);// ("D:\\AGK\\"); // AGKTrunk
+	
 
-	SetCurrentDirectoryWithCheck( "..\\..\\..\\.." ); // AGKTrunk
+	// set some path variables
+	char szVisualStudio[1024]; sprintf(szVisualStudio, "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\devenv.exe");
+	char szDstFolderWinTrial[1024]; sprintf(szDstFolderWinTrial, "%s\\AGK_Build\\Builds\\Studio\\AGKStudioWindowsTrial", szRepoRoot);
+	char szSharedFolder[1024]; sprintf(szSharedFolder, "%s\\AGK_Build\\Shared\\WindowsReceive", szRepoRoot);
+	char szTemp[1024]; sprintf(szTemp, "%s\\AGK_Build\\Temp", szRepoRoot);
+
+	char rootFolder[1024];
+	GetCurrentDirectory(1024, rootFolder);
 
 	int index = -1;
 	bool bSingleCommand = false;
@@ -49,23 +62,14 @@ startPoint:
 
 	if ( bListCommands ) Message( "Note: Help and command list must be done by the full build first!" );
 
-	// Update SVN
-	if ( !bListCommands )
-	{
-		int status = 0;
-		status = RunCmd( indexCheck, szTortoiseSVN, "/command:update /path:\".\" /closeonend:3" );
-		if ( status != 0 ) Error( "Failed" );
-		else Message( "  Success" );
-	}
-
-	// VS2015 (full version is for the broadcaster)
+	//Visual Studio (full version is for the broadcaster)
 	if ( index <= ++indexCheck )
 	{
-		if ( bListCommands ) Message1( "%d: Compile VS2015 Release (for broadcaster)", indexCheck );
+		if ( bListCommands ) Message1( "%d: Compile Visual Studio Release (for broadcaster)", indexCheck );
 		else
 		{
 			int status = 0;
-			status = RunCmd( indexCheck, szVS2015, "AGKWindows2015.sln /rebuild Release" );
+			status = RunCmd( indexCheck, szVisualStudio, "AGKWindows.sln /rebuild \"Release|x64\"");
 			if ( status != 0 ) Error( "Failed" );
 			else Message( "  Success" );
 			
@@ -73,14 +77,14 @@ startPoint:
 		}
 	}
 
-	// VS2015 Free
+	// VSisual Studio Free
 	if ( index <= ++indexCheck )
 	{
-		if ( bListCommands ) Message1( "%d: Compile VS2015 ReleaseFree", indexCheck );
+		if ( bListCommands ) Message1( "%d: Compile Visual Studio ReleaseFree", indexCheck );
 		else
 		{
 			int status = 0;
-			status = RunCmd( indexCheck, szVS2015, "AGKWindows2015.sln /rebuild ReleaseFree" );
+			status = RunCmd( indexCheck, szVisualStudio, "AGKWindows.sln /rebuild \"ReleaseFree|x64\"" );
 			if ( status != 0 ) Error( "Failed" );
 			else Message( "  Success" );
 			
@@ -88,71 +92,74 @@ startPoint:
 		}
 	}
 
-	// VS2015 Free 64-bit
-	if ( index <= ++indexCheck )
+	// Compiler Static Lib (for Studio IDE Trial)
+	if (index <= ++indexCheck)
 	{
-		if ( bListCommands ) Message1( "%d: Compile VS2015 64-bit ReleaseFree", indexCheck );
+		if (bListCommands) Message1("%d: Compile AGK Compiler Static Lib", indexCheck);
 		else
 		{
+			SetCurrentDirectoryWithCheck("CompilerNew");
 			int status = 0;
-			status = RunCmd( indexCheck, szVS2015, "AGKWindows2015-64.sln /rebuild ReleaseFree" );
-			if ( status != 0 ) Error( "Failed" );
-			else Message( "  Success" );
+			status = RunCmd(indexCheck, szVisualStudio, "AGKCompiler2.sln /rebuild \"ReleaseStaticTrial|x64\"");
+			if (status != 0) Error("Failed");
+			else Message("  Success");
+			SetCurrentDirectoryWithCheck("..");
 
-			if ( bSingleCommand ) goto endPoint;
+			if (bSingleCommand) goto endPoint;
 		}
 	}
 
 	// Compiler
-	if ( index <= ++indexCheck )
+	//if ( index <= ++indexCheck )
+	//{
+	//	if ( bListCommands ) Message1( "%d: Compile AGK Compiler Free", indexCheck );
+	//	else
+	//	{
+		//	SetCurrentDirectoryWithCheck( "CompilerNew" );
+		//	int status = 0;
+		//	status = RunCmd( indexCheck, szVisualStudio, "AGKCompiler2.sln /rebuild ReleaseFree" );
+		//	if ( status != 0 ) Error( "Failed" );
+		//	else Message( "  Success" );
+		//	SetCurrentDirectoryWithCheck( ".." );
+			
+		//	if ( bSingleCommand ) goto endPoint;
+	//	}
+//	}
+
+	// Broadcaster Static Lib (for Studio IDE)
+	if (index <= ++indexCheck)
 	{
-		if ( bListCommands ) Message1( "%d: Compile AGK Compiler Free", indexCheck );
+		if (bListCommands) Message1("%d: Compile AGK Broadcaster Static Lib", indexCheck);
 		else
 		{
-			SetCurrentDirectoryWithCheck( "CompilerNew" );
+			SetCurrentDirectoryWithCheck("Broadcaster\\AGKBroadcaster");
 			int status = 0;
-			status = RunCmd( indexCheck, szVS2015, "AGKCompiler2.sln /rebuild ReleaseFree" );
-			if ( status != 0 ) Error( "Failed" );
-			else Message( "  Success" );
-			SetCurrentDirectoryWithCheck( ".." );
-			
-			if ( bSingleCommand ) goto endPoint;
+			status = RunCmd(indexCheck, szVisualStudio, "AGKBroadcaster.sln /rebuild \"ReleaseStaticLibIDE|x64\"");
+			if (status != 0) Error("Failed");
+			else Message("  Success");
+			SetCurrentDirectoryWithCheck("..\\..");
+
+			if (bSingleCommand) goto endPoint;
 		}
 	}
 
 	// Broadcaster (for debugging)
-	if ( index <= ++indexCheck )
-	{
-		if ( bListCommands ) Message1( "%d: Compile AGK Broadcaster (for debugging)", indexCheck );
-		else
-		{
-			SetCurrentDirectoryWithCheck( "Broadcaster\\AGKBroadcaster" );
-			int status = 0;
-			status = RunCmd( indexCheck, szVS2015, "AGKBroadcaster.sln /rebuild Release" );
-			if ( status != 0 ) Error( "Failed" );
-			else Message( "  Success" );
-			SetCurrentDirectoryWithCheck( "..\\.." );
+	//if ( index <= ++indexCheck )
+//	{
+		//if ( bListCommands ) Message1( "%d: Compile AGK Broadcaster (for debugging)", indexCheck );
+		//else
+		//{
+			//SetCurrentDirectoryWithCheck( "Broadcaster\\AGKBroadcaster" );
+			//int status = 0;
+			//status = RunCmd( indexCheck, szVisualStudio, "AGKBroadcaster.sln /rebuild Release" );
+			//if ( status != 0 ) Error( "Failed" );
+		//	else Message( "  Success" );
+		//	SetCurrentDirectoryWithCheck( "..\\.." );
 			
-			if ( bSingleCommand ) goto endPoint;
-		}
-	}
+		//	if ( bSingleCommand ) goto endPoint;
+		//}
+	//}
 
-	// interpreter
-	if ( index <= ++indexCheck )
-	{
-		if ( bListCommands ) Message1( "%d: Compile Windows interpreter ReleaseFree", indexCheck );
-		else
-		{
-			SetCurrentDirectoryWithCheck( "apps\\interpreter" );
-			int status = 0;
-			status = RunCmd( indexCheck, szVS2015, "interpreter.sln /rebuild \"ReleaseFree|Win32\"" );
-			if ( status != 0 ) Error( "Failed" );
-			else Message( "  Success" );
-			SetCurrentDirectoryWithCheck( "..\\.." );
-			
-			if ( bSingleCommand ) goto endPoint;
-		}
-	}
 
 	// interpreter 64-bit
 	if ( index <= ++indexCheck )
@@ -162,7 +169,7 @@ startPoint:
 		{
 			SetCurrentDirectoryWithCheck( "apps\\interpreter" );
 			int status = 0;
-			status = RunCmd( indexCheck, szVS2015, "interpreter.sln /rebuild \"ReleaseFree|x64\"" );
+			status = RunCmd( indexCheck, szVisualStudio, "interpreter.sln /rebuild \"ReleaseFree|x64\"" );
 			if ( status != 0 ) Error( "Failed" );
 			else Message( "  Success" );
 			SetCurrentDirectoryWithCheck( "..\\.." );
@@ -170,180 +177,119 @@ startPoint:
 			if ( bSingleCommand ) goto endPoint;
 		}
 	}
-
-	// IDE
-	if ( index <= ++indexCheck )
+	
+	
+	// Build IDE
+	if (index <= ++indexCheck)
 	{
-		if ( bListCommands ) Message1( "%d: Build IDE", indexCheck );
+		if (bListCommands) Message1("%d: Compile Windows IDE", indexCheck);
 		else
 		{
-			Message( "Building IDE" );
-			SetCurrentDirectoryWithCheck( "IDE\\Geany-1.24.1" );
+			SetCurrentDirectoryWithCheck("AgkIde");
+			int status = 0;
+			status = RunCmd(indexCheck, szVisualStudio, "Ide.sln /rebuild \"ReleaseTrial\"");
+			if (status != 0) Error("Failed");
+			else Message("  Success");
+			SetCurrentDirectoryWithCheck("..");
 
-			// edit geany.h
-			Message( "  Editing header" );
-			char *data = 0;
-			int size = GetFileContents( "src\\geany.h", &data );
-			if ( !data || !size ) Error( "    Failed to read geany.h" );
-			char *define = strstr( data, "//#define AGK_FREE_VERSION" );
-			if ( !define )
-			{
-				Message( "    Couldn't find commented out define, looking for active define" );
-				define = strstr( data, "  #define AGK_FREE_VERSION" );
-				if ( !define ) Error( "    Failed to find free version define in geany.h" );
-				else Message( "    Define is already active" );
-			}
-			else
-			{
-				Message( "    Making free version define active" );
-				define[ 0 ] = ' ';
-				define[ 1 ] = ' ';
-
-				FILE *fp = fopen( "src\\geany.h", "wb" );
-				if ( !fp ) Error( "Failed to open geany.h for writing" );
-				fwrite( data, 1, size, fp );
-				fclose( fp );
-			}
-			
-			Message( "  Compiling" );
-			int status = RunCmd( indexCheck, "make", "TRIAL=1 -f makefile.win32" );
-			if ( status != 0 ) Error( "Failed" );
-			else Message( "  Success" );
-
-			Message( "Building IDE - install" );
-			status = RunCmd( indexCheck, "make", "install -f makefile.win32" );
-			if ( status != 0 ) Error( "Failed" );
-			else Message( "  Success" );
-
-			Message( "Editing header" );
-			Message( "  Commenting out free version define" );
-			define[ 0 ] = '/';
-			define[ 1 ] = '/';
-
-			FILE *fp = fopen( "src\\geany.h", "wb" );
-			if ( !fp ) Error( "  Failed to open geany.h for writing" );
-			fwrite( data, 1, size, fp );
-			fclose( fp );
-
-			delete [] data;
-
-			SetCurrentDirectoryWithCheck( "..\\.." );
-
-			if ( bSingleCommand ) goto endPoint;
+			if (bSingleCommand) goto endPoint;
 		}
 	}
 
-	// copy to build folders
-	if ( index <= ++indexCheck )
+	// must be done before anything modifies the build folder, otherwise those changes will be overwritten
+	if (index <= ++indexCheck)
 	{
-		if ( bListCommands ) Message1( "%d: Copy files to build folders", indexCheck );
+		if (bListCommands) Message1("%d: Copy IDE files to build folders", indexCheck);
 		else
 		{
+			char msg[128];
+			sprintf(msg, "%d: Copying IDE media folder and exe to build folder", indexCheck);
+			Message(msg);
+
+			// copy media folder
+			char srcFolder[1024];
+			strcpy(srcFolder, rootFolder);
+			strcat(srcFolder, "\\AgkIde\\media");
+
+			char dstFolder[1024];
+			strcpy(dstFolder, szDstFolderWinTrial);
+			strcat(dstFolder, "\\media");
+
+			DeleteFolder(dstFolder);
+			CopyFolder(srcFolder, dstFolder);
+
+			// copy executable
+			strcpy(dstFolder, szDstFolderWinTrial);
+			strcat(dstFolder, "\\Ide.exe");
+			CopyFile2("AgkIde\\Final\\Ide.exe", dstFolder);
+
+			if (bSingleCommand) goto endPoint;
+		}
+	}
+
+	// copy to Windows Trial build folder
+	if ( index <= ++indexCheck )
+	{
+		if ( bListCommands ) Message1("%d: Copy files to Windows Trial build folder", indexCheck );
+		else
+		{
+
+			char msg[128];
+			sprintf(msg, "%d: Copying files to Windows Trial build folder", indexCheck);
+			Message(msg);
+
 			char srcFolder[ 1024 ];
 			char dstFolder[ 1024 ];
 			char backupFolder[ 1024 ];
 			FileRecord files;
 
-			Message( "Copying to Windows Trial build" );
-			Message( "  Copying Tier 2 files" );
-
-			// update apps folder
-			Message( "    Copying apps folder" );
-			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\apps" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 2\\apps" );
-			// make a copy of the files in case we ever lose the folder structure
-			//files.Reset(); RecordFiles( dstFolder, &files ); strcpy( backupFolder, "tools\\AGKBuildSystem\\Backup\\WindowsTrial\\appFiles.txt" ); files.Save( backupFolder );
-			UpdateFolder( srcFolder, dstFolder );
-			
-			// update common folder
-			Message( "    Copying common folder" );
-			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\common\\include" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 2\\common\\include" );
-			//files.Reset(); RecordFiles( dstFolder, &files ); sprintf( backupFolder, "tools\\AGKBuildSystem\\Backup\\%s\\commonIncludeFiles.txt", szBuildPlatform[b] ); files.Save( backupFolder );
-			DeleteFolder( dstFolder );
-			CopyFolder( srcFolder, dstFolder );
-
-			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\common\\Collision" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 2\\common\\Collision" );
-			//files.Reset(); RecordFiles( dstFolder, &files ); sprintf( backupFolder, "tools\\AGKBuildSystem\\Backup\\%s\\commonCollisionFiles.txt", szBuildPlatform[b] ); files.Save( backupFolder );
-			DeleteFolder( dstFolder );
-			const char *szIgnore[] = { ".cpp", ".c", ".CPP", ".C" };
-			CopyFolder( srcFolder, dstFolder, 4, szIgnore );
-
-			// update bullet folder
-			Message( "    Copying bullet folder" );
-			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\bullet" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 2\\bullet" );
-			//files.Reset(); RecordFiles( dstFolder, &files ); sprintf( backupFolder, "tools\\AGKBuildSystem\\Backup\\%s\\bulletFiles.txt", szBuildPlatform[b] ); files.Save( backupFolder );
-			DeleteFolder( dstFolder );
-			CopyFolder( srcFolder, dstFolder, 4, szIgnore );
-
-			// update platform folder
-			Message( "    Copying platform folder" );
-			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\platform" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 2\\platform" );
-			//files.Reset(); RecordFiles( dstFolder, &files ); strcpy( backupFolder, "tools\\AGKBuildSystem\\Backup\\WindowsTrial\\platformFiles.txt" ); files.Save( backupFolder );
-			UpdateFolder( srcFolder, dstFolder );
-
-			Message( "    Copying free libs" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 2\\platform\\windows\\Lib\\VS2015\\Release\\AGKWindows.lib" );
-			CopyFile2( "platform\\windows\\Lib\\VS2015\\Free\\AGKWindows.lib", dstFolder );			
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 2\\platform\\windows\\Lib\\VS2015\\Release64\\AGKWindows.lib" );
-			CopyFile2( "platform\\windows\\Lib\\VS2015\\Free64\\AGKWindows64.lib", dstFolder );
-
+			// copying help files
+			Message("    Copying help files");
+			strcpy(srcFolder, szSharedFolder); strcat(srcFolder, "\\Studio\\Help");
+			strcpy(dstFolder, szDstFolderWinTrial); strcat(dstFolder, "\\media\\Help");
+			DeleteFolder(dstFolder);
+			CopyFolder(srcFolder, dstFolder);
+		
 			// copy changelog
-			Message( "  Copying other files" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\ChangeLog.txt" );
+			Message("    Copying change log");
+			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\ChangeLog.txt" );
 			CopyFile2( "AGK.txt", dstFolder );
 
-			// copy compiler
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Compiler\\AGKCompiler.exe" );
-			CopyFile2( "CompilerNew\\Final\\AGKCompiler.exe", dstFolder );
-
-			// copy commandlist.dat
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Compiler\\CommandList.dat" );
-			CopyFile2( "CompilerNew\\CommandList.dat", dstFolder );
-
 			// copy plugins
+			Message("    Copying plugins");
 			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\plugins\\Plugins" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Compiler\\Plugins" );
+			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\Plugins" );
 			DeleteFolder( dstFolder );
 			CopyFolder( srcFolder, dstFolder );
 
-			// copy broadcaster
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Compiler\\AGKBroadcaster.exe" );
-			CopyFile2( "Broadcaster\\AGKBroadcaster\\Release\\AGKBroadcaster.exe", dstFolder );
-
 			// copy interpreter
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Compiler\\interpreters\\Windows.exe" );
-			CopyFile2( "apps\\interpreter\\Final\\Windows.exe", dstFolder );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Compiler\\interpreters\\Windows64.exe" );
+			Message("    Copying interpreter");
+			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\media\\interpreters\\Windows64.exe" );
 			CopyFile2( "apps\\interpreter\\Final\\Windows64.exe", dstFolder );
 
 			// copy image joiner
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Utilities\\ImageJoiner\\ImageJoiner.exe" );
+			Message("    Copying image joiner");
+			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\Utilities\\ImageJoiner.exe" );
 			CopyFile2( "tools\\ImageJoiner.exe", dstFolder );
 
-			Message( "  Copying IDE" );
-			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\IDE\\Geany_Compiled" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Editor" );
+			// copying example projects
+			Message( "    Copying Example Projects" );
+			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\Examples" );
+			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\media\\Projects" );
 			DeleteFolder( dstFolder );
 			CopyFolder( srcFolder, dstFolder );
 
 			// delete unnecessary IDE folders
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Editor\\data\\android" );
-			DeleteFolder( dstFolder );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Editor\\data\\ios" );
-			DeleteFolder( dstFolder );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Tier 1\\Editor\\data\\html5" );
-			DeleteFolder( dstFolder );
-
-			// copying example projects
-			Message( "  Copying Example Projects" );
-			GetCurrentDirectory( 1024, srcFolder ); strcat( srcFolder, "\\Examples" );
-			strcpy( dstFolder, szDstFolderWinTrial ); strcat( dstFolder, "\\AGK\\Projects" );
-			DeleteFolder( dstFolder );
-			CopyFolder( srcFolder, dstFolder );
+			Message("    Delete Unnecessary IDE folders (android, ios, html5)");
+			strcpy(dstFolder, szDstFolderWinTrial); strcat(dstFolder, "\\media\\data\\android");
+			DeleteFolder(dstFolder);
+			RemoveDirectory(dstFolder);
+			strcpy(dstFolder, szDstFolderWinTrial); strcat(dstFolder, "\\media\\data\\ios");
+			DeleteFolder(dstFolder);
+			RemoveDirectory(dstFolder);
+			strcpy(dstFolder, szDstFolderWinTrial); strcat(dstFolder, "\\media\\data\\html5");
+			DeleteFolder(dstFolder);
+			RemoveDirectory(dstFolder);
 
 			if ( bSingleCommand ) goto endPoint;
 		}
@@ -355,11 +301,6 @@ startPoint:
 		goto startPoint;
 	}
 
-	// Commit SVN
-	int status = 0;
-	Message( "Comitting SVN" );
-	status = RunCmd( indexCheck, szTortoiseSVN, "/command:commit /path:\".\"" );
-	
 endPoint:
 	system("pause");
 	return 0;

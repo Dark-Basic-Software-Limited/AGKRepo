@@ -60,6 +60,37 @@ static GLFWcharfun          g_PrevUserCallbackChar = NULL;
 static void ImGui_ImplGlfw_InitPlatformInterface();
 static void ImGui_ImplGlfw_ShutdownPlatformInterface();
 static void ImGui_ImplGlfw_UpdateMonitors();
+static ImGuiKey ImGui_ImplGlfw_KeyToImGuiKey(int key);
+// Minimal mapping function (subset), align with upstream helper in official backend
+static ImGuiKey ImGui_ImplGlfw_KeyToImGuiKey(int key)
+{
+    switch (key)
+    {
+    case GLFW_KEY_TAB: return ImGuiKey_Tab;
+    case GLFW_KEY_LEFT: return ImGuiKey_LeftArrow;
+    case GLFW_KEY_RIGHT: return ImGuiKey_RightArrow;
+    case GLFW_KEY_UP: return ImGuiKey_UpArrow;
+    case GLFW_KEY_DOWN: return ImGuiKey_DownArrow;
+    case GLFW_KEY_PAGE_UP: return ImGuiKey_PageUp;
+    case GLFW_KEY_PAGE_DOWN: return ImGuiKey_PageDown;
+    case GLFW_KEY_HOME: return ImGuiKey_Home;
+    case GLFW_KEY_END: return ImGuiKey_End;
+    case GLFW_KEY_INSERT: return ImGuiKey_Insert;
+    case GLFW_KEY_DELETE: return ImGuiKey_Delete;
+    case GLFW_KEY_BACKSPACE: return ImGuiKey_Backspace;
+    case GLFW_KEY_SPACE: return ImGuiKey_Space;
+    case GLFW_KEY_ENTER: return ImGuiKey_Enter;
+    case GLFW_KEY_ESCAPE: return ImGuiKey_Escape;
+    default: break;
+    }
+    if (key >= GLFW_KEY_F1 && key <= GLFW_KEY_F12)
+        return (ImGuiKey)(ImGuiKey_F1 + (key - GLFW_KEY_F1));
+    if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9)
+        return (ImGuiKey)(ImGuiKey_0 + (key - GLFW_KEY_0));
+    if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z)
+        return (ImGuiKey)(ImGuiKey_A + (key - GLFW_KEY_A));
+    return ImGuiKey_None;
+}
 
 static const char* ImGui_ImplGlfw_GetClipboardText(void* user_data)
 {
@@ -102,8 +133,7 @@ void ImGui_ImplGlfw_ScrollCallback(GLFWwindow* window, double xoffset, double yo
         g_PrevUserCallbackScroll(window, xoffset, yoffset);
 
     ImGuiIO& io = ImGui::GetIO();
-    io.MouseWheelH += (float)xoffset;
-    io.MouseWheel += (float)yoffset;
+    io.AddMouseWheelEvent((float)xoffset, (float)yoffset);
 }
 
 // platform specific
@@ -197,16 +227,15 @@ void ImGui_ImplGlfw_KeyCallback(GLFWwindow*, int key, int, int action, int mods)
 {
 	os_messages += 3;
     ImGuiIO& io = ImGui::GetIO();
-    if (action == GLFW_PRESS)
-        io.KeysDown[key] = true;
-    if (action == GLFW_RELEASE)
-        io.KeysDown[key] = false;
-
-    (void)mods; // Modifiers are not reliable across systems
-    io.KeyCtrl = io.KeysDown[GLFW_KEY_LEFT_CONTROL] || io.KeysDown[GLFW_KEY_RIGHT_CONTROL];
-    io.KeyShift = io.KeysDown[GLFW_KEY_LEFT_SHIFT] || io.KeysDown[GLFW_KEY_RIGHT_SHIFT];
-    io.KeyAlt = io.KeysDown[GLFW_KEY_LEFT_ALT] || io.KeysDown[GLFW_KEY_RIGHT_ALT];
-    io.KeySuper = io.KeysDown[GLFW_KEY_LEFT_SUPER] || io.KeysDown[GLFW_KEY_RIGHT_SUPER];
+    // Map GLFW key to ImGuiKey and feed event
+    ImGuiKey imgui_key = ImGui_ImplGlfw_KeyToImGuiKey(key);
+    if (imgui_key != ImGuiKey_None)
+        io.AddKeyEvent(imgui_key, action == GLFW_PRESS);
+    // Modifiers
+    io.AddKeyEvent(ImGuiKey_ModCtrl,  (mods & GLFW_MOD_CONTROL) != 0);
+    io.AddKeyEvent(ImGuiKey_ModShift, (mods & GLFW_MOD_SHIFT)   != 0);
+    io.AddKeyEvent(ImGuiKey_ModAlt,   (mods & GLFW_MOD_ALT)     != 0);
+    io.AddKeyEvent(ImGuiKey_ModSuper, (mods & GLFW_MOD_SUPER)   != 0);
 
 	if (action == GLFW_PRESS)
 	{

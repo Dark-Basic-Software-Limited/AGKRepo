@@ -71,3 +71,9 @@ namespace ImGui
     void MyFunction(const char* name, const MyMatrix44& v);
 }
 */
+
+// Ensure math operators for ImVec2/ImVec4 are available project-wide and defined
+// before including imgui.h anywhere, as required by imgui_internal.h checks.
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
+#define IMGUI_DEFINE_MATH_OPERATORS
+#endif

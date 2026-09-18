@@ -251,6 +251,11 @@ cSprite::cSprite( const cSprite *pOtherSprite ) : m_shaderImages(0) // 0 because
 
 	m_colResult = new b2DistanceOutput();
 
+	// set default physics values for cloned sprite 
+	m_fGravityScale = 1.0f;
+	m_bAwake = true;
+	m_bSleep = true;
+
 	if ( pOtherSprite->m_iNumAdditionalShapes == 0 || pOtherSprite->m_phyAdditionalShapes == 0 )
 	{
 		m_iNumAdditionalShapes = 0;

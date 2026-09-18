@@ -96,7 +96,13 @@ void AGKDisplayMessage( const char* msg )
 
 void cFile::Init( const char* projectPath )
 {
-	strcpy_s( g_szWriteDir, projectPath );
+#if GEANY_IDE
+	unsigned int length = (unsigned int)GetCurrentDirectory(MAX_PATH, g_szWriteDir); //added for Geany to work
+#else
+	strcpy_s(g_szWriteDir, projectPath);
+	int length = (int)strlen(g_szWriteDir);
+#endif
+
 	char* ptr = g_szWriteDir;
 	while( *ptr )
 	{
@@ -104,7 +110,6 @@ void cFile::Init( const char* projectPath )
 		ptr++;
 	}
 
-	int length = (int) strlen( g_szWriteDir );
 	if ( g_szWriteDir[ length-1 ] != '/' )
 	{
 		g_szWriteDir[ length ] = '/';

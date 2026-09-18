@@ -11,6 +11,17 @@
 static MediaScene::MediaObject * test;
 static char newgrouparray[MAX_PATH];
 
+// Helper: build a printf-style float format string from a decimal precision value (e.g., 2 -> "%.2f")
+static inline const char* fmt_from_precision(int precision)
+{
+	static char buf[16];
+	if (precision < 0) precision = 0;
+	if (precision > 9) precision = 9;
+	// Note: double '%%' is for literal percent, here we only want a float format
+	snprintf(buf, sizeof(buf), "%%.%df", precision);
+	return buf;
+}
+
 
 MediaScene::MediaScene()
 	: bGridOn(true)
@@ -134,6 +145,29 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 		alt = io.KeyAlt;
 	}
 	bool is_osx = io.ConfigMacOSXBehaviors;
+
+	// Map Win32 Virtual-Key codes (stored in preferences) to ImGuiKey for IsKeyPressed in ImGui 1.90+
+	auto VkToImGuiKey = [](int vk) -> ImGuiKey
+	{
+		switch (vk)
+		{
+			case '0': return ImGuiKey_0; case '1': return ImGuiKey_1; case '2': return ImGuiKey_2; case '3': return ImGuiKey_3; case '4': return ImGuiKey_4;
+			case '5': return ImGuiKey_5; case '6': return ImGuiKey_6; case '7': return ImGuiKey_7; case '8': return ImGuiKey_8; case '9': return ImGuiKey_9;
+			case 'A': return ImGuiKey_A; case 'B': return ImGuiKey_B; case 'C': return ImGuiKey_C; case 'D': return ImGuiKey_D; case 'E': return ImGuiKey_E;
+			case 'F': return ImGuiKey_F; case 'G': return ImGuiKey_G; case 'H': return ImGuiKey_H; case 'I': return ImGuiKey_I; case 'J': return ImGuiKey_J;
+			case 'K': return ImGuiKey_K; case 'L': return ImGuiKey_L; case 'M': return ImGuiKey_M; case 'N': return ImGuiKey_N; case 'O': return ImGuiKey_O;
+			case 'P': return ImGuiKey_P; case 'Q': return ImGuiKey_Q; case 'R': return ImGuiKey_R; case 'S': return ImGuiKey_S; case 'T': return ImGuiKey_T;
+			case 'U': return ImGuiKey_U; case 'V': return ImGuiKey_V; case 'W': return ImGuiKey_W; case 'X': return ImGuiKey_X; case 'Y': return ImGuiKey_Y; case 'Z': return ImGuiKey_Z;
+			case VK_OEM_PLUS: return ImGuiKey_Equal; case VK_OEM_MINUS: return ImGuiKey_Minus; case VK_OEM_COMMA: return ImGuiKey_Comma; case VK_OEM_PERIOD: return ImGuiKey_Period; case VK_OEM_2: return ImGuiKey_Slash;
+			case VK_PRIOR: return ImGuiKey_PageUp; case VK_NEXT: return ImGuiKey_PageDown; case VK_HOME: return ImGuiKey_Home; case VK_END: return ImGuiKey_End;
+			case VK_LEFT: return ImGuiKey_LeftArrow; case VK_RIGHT: return ImGuiKey_RightArrow; case VK_UP: return ImGuiKey_UpArrow; case VK_DOWN: return ImGuiKey_DownArrow;
+			case VK_DELETE: return ImGuiKey_Delete; case VK_BACK: return ImGuiKey_Backspace; case VK_SPACE: return ImGuiKey_Space; case VK_TAB: return ImGuiKey_Tab; case VK_RETURN: return ImGuiKey_Enter;
+			case VK_F1: return ImGuiKey_F1; case VK_F2: return ImGuiKey_F2; case VK_F3: return ImGuiKey_F3; case VK_F4: return ImGuiKey_F4; case VK_F5: return ImGuiKey_F5; case VK_F6: return ImGuiKey_F6;
+			case VK_F7: return ImGuiKey_F7; case VK_F8: return ImGuiKey_F8; case VK_F9: return ImGuiKey_F9; case VK_F10: return ImGuiKey_F10; case VK_F11: return ImGuiKey_F11; case VK_F12: return ImGuiKey_F12;
+			default:
+				return ImGuiKey_None;
+		}
+	};
 
 	//ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
@@ -274,7 +308,7 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 		if (bGridOn) {
 			ImGui::SameLine();
 			ImGui::PushItemWidth(40);
-			ImGui::InputFloat("X", &fGridX, 0.0f, 0.0f, 2);
+			ImGui::InputFloat("X", &fGridX, 0.0f, 0.0f, "%.2f");
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Value");
 			if (fGridX < 4.0f)
 				fGridX = 4.0f;
@@ -283,7 +317,7 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 			ImGui::PopItemWidth();
 			ImGui::SameLine();
 			ImGui::PushItemWidth(40);
-			ImGui::InputFloat("Y", &fGridY, 0.0f, 0.0f, 2);
+			ImGui::InputFloat("Y", &fGridY, 0.0f, 0.0f, "%.2f");
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid Y Value");
 
 			ImGui::PopItemWidth();
@@ -519,26 +553,26 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 
 	wtabvisible = ImGui::windowTabVisible(); //PE 26-03-2019
 
-	ImGui::PushAllowKeyboardFocus(true);
+	ImGui::PushItemFlag(ImGuiItemFlags_NoTabStop, false);
 	//Global Keys.
 
-	if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(27)) { //esc exit draw mode.
+	if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Escape)) { //esc exit draw mode.
 		if(m_pSelectedImage)
 			m_pSelectedImage = NULL;
 	}
 
 	if (ImGui::IsWindowFocused() && wtabvisible)
 	{
-		if (ctrl == pref.bUndoCtrl && shift == pref.bUndoShift && alt == pref.bUndoAlt && ImGui::IsKeyPressed(pref.iUndoKey)) {
+	if (ctrl == pref.bUndoCtrl && shift == pref.bUndoShift && alt == pref.bUndoAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iUndoKey))) {
 			Undo();
 		}
-		else if (!ctrl && !shift && alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Backspace))) {
+	else if (!ctrl && !shift && alt && ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
 			Undo();
 		}
-		else if (ctrl == pref.bRedoCtrl && shift == pref.bRedoShift && alt == pref.bRedoAlt && ImGui::IsKeyPressed(pref.iRedoKey)) {
+	else if (ctrl == pref.bRedoCtrl && shift == pref.bRedoShift && alt == pref.bRedoAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iRedoKey))) {
 			Redo();
 		}
-		else if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Delete))) {
+	else if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
 			if (m_pSelectedObject) {
 				Delete();
 			}
@@ -563,48 +597,48 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 */
 
 		}
-		else if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(27) ) { //esc
+	else if (!ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Escape) ) { //esc
 			//Reset.
 			m_pSelectedImage = NULL;
 		}
-		else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Insert))) {
+	else if (ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Insert)) {
 			if(m_pSelectedObject)
 				CopyObject(m_pSelectedObject);
 		}
-		else if (!ctrl && shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Insert))) {
+	else if (!ctrl && shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Insert)) {
 			PasteObject();
 			m_editor->filechanged = true;
 		}
 		//MAC: Emulate pc "insert" by using "delete" key instead. only for CTRL+SHIFT operations.
-		else if (is_osx && keyboard_layout == 0 && ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Delete))) {
+	else if (is_osx && keyboard_layout == 0 && ctrl && !shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
 			if (m_pSelectedObject)
 				CopyObject(m_pSelectedObject);
 		}
-		else if (is_osx && keyboard_layout == 0 && !ctrl && shift && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Delete))) {
+	else if (is_osx && keyboard_layout == 0 && !ctrl && shift && !alt && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
 			PasteObject();
 			m_editor->filechanged = true;
 		}
 		//
-		else if (ctrl == pref.bCopyCtrl && shift == pref.bCopyShift && alt == pref.bCopyAlt && ImGui::IsKeyPressed(pref.iCopyKey)) {
+	else if (ctrl == pref.bCopyCtrl && shift == pref.bCopyShift && alt == pref.bCopyAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iCopyKey))) {
 			if (m_pSelectedObject)
 				CopyObject(m_pSelectedObject);
 		}
-		else if (ctrl == pref.bPasteCtrl && shift == pref.bPasteShift && alt == pref.bPasteAlt && ImGui::IsKeyPressed(pref.iPasteKey)) {
+	else if (ctrl == pref.bPasteCtrl && shift == pref.bPasteShift && alt == pref.bPasteAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iPasteKey))) {
 			PasteObject();
 		}
-		if (!ctrl && !alt && m_pSelectedObject && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow))) {
+	if (!ctrl && !alt && m_pSelectedObject && ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
 			m_pSelectedObject->m_Position.x--;
 			m_editor->filechanged = true;
 		}
-		if (!ctrl && !alt && m_pSelectedObject && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow))) {
+	if (!ctrl && !alt && m_pSelectedObject && ImGui::IsKeyPressed(ImGuiKey_RightArrow)) {
 			m_pSelectedObject->m_Position.x++;
 			m_editor->filechanged = true;
 		}
-		if (!ctrl && !alt && m_pSelectedObject && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow))) {
+	if (!ctrl && !alt && m_pSelectedObject && ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
 			m_pSelectedObject->m_Position.y--;
 			m_editor->filechanged = true;
 		}
-		if (!ctrl && !alt && m_pSelectedObject && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow))) {
+	if (!ctrl && !alt && m_pSelectedObject && ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
 			m_pSelectedObject->m_Position.y++;
 			m_editor->filechanged = true;
 		}
@@ -1339,16 +1373,16 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 		ImVec2 diff;
 		float scalex, scaley;
 
-		if (!ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_LeftArrow))) {
+	if (!ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
 			cursoradd.x--;
 		}
-		if (!ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_RightArrow))) {
+	if (!ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_RightArrow)) {
 			cursoradd.x++;
 		}
-		if (!ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow))) {
+	if (!ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
 			cursoradd.y--;
 		}
-		if (!ctrl && !alt && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow))) {
+	if (!ctrl && !alt && ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
 			cursoradd.y++;
 		}
 		if (cursoradd.x != 0 || cursoradd.y != 0) {
@@ -1732,108 +1766,117 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 	}
 
 	extern TextEditor * m_ActiveEditor;
-	if( wtabvisible && (ImGui::IsWindowHovered() || ImGui::IsWindowFocused() ) ) {
-		//Floating controls.
-		int scrollbarsize = 18;
-		ImVec2 cp = ImGui::GetWindowSize();
-		cp.x += ImGui::GetScrollX() - scrollbarsize;
-		cp.y += ImGui::GetScrollY() - scrollbarsize;
-		//Zoom
-		ImGui::PushItemWidth(130);
-		cp.x -= 136 + (ImGui::GetFontSize() * 4);
-		cp.y -= ImGui::GetFontSize()*1.55f;
-		ImGui::SetCursorPos(cp);
-		ImGui::SetItemAllowOverlap();
-		if (ImGui::SliderFloat("##zoom", &zoomAll, -1.0f, 5.0f, "")) {
-		//if (ImGui::SliderFloat("##zoom", &fRatio, -1.0f, 5.0f, "%.3f")) {
-			ide_force_rendering_delayed = true;
-		}
-		ImGui::PopItemWidth();
+	bool overlay_hovered = false;
+	bool overlay_zoom_hovered = false;
+	// Only show overlays if mouse is inside the scene viewport (this child window)
+	ImVec2 __vp_pos = ImGui::GetWindowPos();
+	ImVec2 __vp_size = ImGui::GetWindowSize();
+	bool __mouse_in_viewport = ImGui::IsMouseHoveringRect(__vp_pos, ImVec2(__vp_pos.x + __vp_size.x, __vp_pos.y + __vp_size.y), false);
+	if( wtabvisible && __mouse_in_viewport ) {
+		// Split overlay into two children: top-right (tools) and bottom-right (zoom).
 
-		ImGui::SameLine();
-		if (ImGui::Button("1:1")) {
-			zoomAll = -fRatioAuto + 1.0f;
-			iDelayAction = 1;
-		}
-
-
-		//Test buttom
-
+		// Colors and sizes for icon buttons
 		ImVec4 style_back = ImGui::GetStyle().Colors[ImGuiCol_Text];
 		style_back = style_back * ImVec4(1.2f, 1.2f, 1.2f, 1.2f);
-		ImVec4 drawCol_back = ImColor(255, 255, 255, 0)*style_back; // Not really used as we have transparent icons.
+		ImVec4 drawCol_back = ImColor(255, 255, 255, 0)*style_back; // transparent icon bg
 		ImVec4 drawCol_normal = ImColor(220, 220, 220, 220)*style_back;
 		ImVec4 drawCol_hover = ImColor(255, 255, 255, 255)*style_back;
 		ImVec4 drawCol_Down = ImColor(180, 180, 160, 255)*style_back;
 		ImVec4 drawCol_active = ImColor(120, 220, 120, 220)*style_back;
-		if (pref.iCurrentIconSet == 0) {
-			drawCol_active = ImColor(220, 220, 220, 220)*style_back;
-		}
-		float test_size = 32.0f;// = ImGui::GetFontSize()*2.0f;
+		if (pref.iCurrentIconSet == 0) drawCol_active = ImColor(220, 220, 220, 220)*style_back;
+		float test_size = 32.0f; // icon size
+		float margin = 8.0f;
 
-		cp = ImGui::GetWindowSize();
-		cp.x += ImGui::GetScrollX() - scrollbarsize;
-		cp.x -= (test_size + 4)*4.0f;
-//		cp.x = ImGui::GetScrollX() + 2.0f;
-//		cp.y += ImGui::GetFontSize()*1.55f;
-//		cp.y -= test_size;
-		cp.y = ImGui::GetScrollY();
-		ImGui::SetCursorPos(cp);
+		// Background for children
+		ImVec4 child_bg = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+		child_bg.w = 0.0f; // fully transparent background
 
+		const ImGuiStyle& style = ImGui::GetStyle();
+		float overlayPadX = 2.0f;
+		float overlayPadY = 2.0f;
 
-		if (ImGui::ImgBtn(iToolbarImages[4], ImVec2(test_size, test_size), drawCol_back, drawCol_normal, drawCol_hover, drawCol_Down))
+		// Common right anchoring info
+		ImGuiWindow* win_for_scrollbar = ImGui::GetCurrentWindow();
+		float vscroll_w = win_for_scrollbar ? win_for_scrollbar->ScrollbarSizes.x : 0.0f;
+		float hscroll_h = win_for_scrollbar ? win_for_scrollbar->ScrollbarSizes.y : 0.0f;
+		ImVec2 visible_sz = ImGui::GetWindowSize();
+
+		// -------- Top-right child: tools --------
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, child_bg);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(overlayPadX, overlayPadY));
+		char child_id_top[128];
+		snprintf(child_id_top, sizeof(child_id_top), "##scene_overlay_tools_%p", (void*)this);
+		ImGuiWindowFlags child_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize;
+		ImVec2 child_size_top;
 		{
-			iDelayChanges = 4;
-			Undo();
+			const float row1_w = (test_size * 4.0f) + (style.ItemSpacing.x * 3.0f); // 4 buttons + 3 spacings
+			child_size_top.x = row1_w + (overlayPadX * 2.0f);
+			child_size_top.y = test_size + (overlayPadY * 2.0f);
 		}
-		if (ImGui::IsItemHovered()) 
-			ImGui::SetTooltip("Undo");
-
-
-		cp.x += test_size + 4;
-		ImGui::SetCursorPos(cp);
-
-		if (ImGui::ImgBtn(iToolbarImages[5], ImVec2(test_size, test_size), drawCol_back, drawCol_normal, drawCol_hover, drawCol_Down))
+		ImVec2 cp_top;
+		cp_top.y = ImGui::GetScrollY() + margin;
+		cp_top.x = ImGui::GetScrollX() + visible_sz.x - vscroll_w - child_size_top.x - 2.0f;
+		if (cp_top.x < ImGui::GetScrollX() + margin) cp_top.x = ImGui::GetScrollX() + margin;
+		ImGui::SetCursorPos(cp_top);
+		if (ImGui::BeginChild(child_id_top, child_size_top, false, child_flags))
 		{
-			iDelayChanges = 4;
-			Redo();
-		}
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("Redo");
-
-		
-		cp.x += test_size + 4;
-		ImGui::SetCursorPos(cp);
-
-		if (ImGui::ImgBtn(iToolbarImages[14], ImVec2(test_size, test_size), drawCol_back, drawCol_normal, drawCol_hover, drawCol_Down))
-		{
-			iDelayChanges = 4;
-			zoomAll = RESETZOOM;
-			iDelayAction = 1;
-		}
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip("Reset View");
-
-
-		cp.x += test_size + 4;
-		ImGui::SetCursorPos(cp);
-
-
-		if (ImGui::ImgBtn(!bTestMode ? iToolbarImages[7]: iToolbarImagesDown[7], ImVec2(test_size,test_size), drawCol_back, !bTestMode ? drawCol_normal : drawCol_active, !bTestMode ? drawCol_hover : drawCol_active, drawCol_Down))
-		{
-			iDelayChanges = 4;
-			if (bTestMode) {
-				bTestMode = false;
-				scene_editor_testmode = false;
+			// Undo
+			if (ImGui::ImgBtn(iToolbarImages[4], ImVec2(test_size, test_size), drawCol_back, drawCol_normal, drawCol_hover, drawCol_Down)) { iDelayChanges = 4; Undo(); }
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Undo");
+			ImGui::SameLine();
+			// Redo
+			if (ImGui::ImgBtn(iToolbarImages[5], ImVec2(test_size, test_size), drawCol_back, drawCol_normal, drawCol_hover, drawCol_Down)) { iDelayChanges = 4; Redo(); }
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Redo");
+			ImGui::SameLine();
+			// Reset View
+			if (ImGui::ImgBtn(iToolbarImages[14], ImVec2(test_size, test_size), drawCol_back, drawCol_normal, drawCol_hover, drawCol_Down)) { iDelayChanges = 4; zoomAll = RESETZOOM; iDelayAction = 1; }
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Reset View");
+			ImGui::SameLine();
+			// Test Mode toggle
+			if (ImGui::ImgBtn(!bTestMode ? iToolbarImages[7] : iToolbarImagesDown[7], ImVec2(test_size, test_size), drawCol_back, !bTestMode ? drawCol_normal : drawCol_active, !bTestMode ? drawCol_hover : drawCol_active, drawCol_Down))
+			{
+				iDelayChanges = 4;
+				if (bTestMode) { bTestMode = false; scene_editor_testmode = false; }
+				else { bTestMode = true; scene_editor_testmode = true; }
 			}
-			else {
-				bTestMode = true;
-				scene_editor_testmode = true;
-			}
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip(!bTestMode ? "Start Test Mode" : "Stop Test Mode");
+			overlay_hovered = ImGui::IsWindowHovered();
 		}
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip(!bTestMode ? "Start Test Mode" : "Stop Test Mode");
+		ImGui::EndChild();
+		ImGui::PopStyleVar();
+		ImGui::PopStyleColor();
+
+		// -------- Bottom-right child: zoom --------
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, child_bg);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(overlayPadX, overlayPadY));
+		char child_id_zoom[128];
+		snprintf(child_id_zoom, sizeof(child_id_zoom), "##scene_overlay_zoom_%p", (void*)this);
+		ImVec2 child_size_zoom;
+		{
+			const float slider_w = 140.0f;
+			const float button_w = ImGui::CalcTextSize("1:1").x + style.FramePadding.x * 2.0f;
+			const float row_w = slider_w + style.ItemSpacing.x + button_w;
+			child_size_zoom.x = row_w + (overlayPadX * 2.0f);
+			child_size_zoom.y = ImGui::GetFrameHeight() + (overlayPadY * 2.0f);
 		}
+		ImVec2 cp_bottom;
+		cp_bottom.y = ImGui::GetScrollY() + visible_sz.y - hscroll_h - child_size_zoom.y - 2.0f; // 2px above horizontal scrollbar
+		if (cp_bottom.y < ImGui::GetScrollY() + margin) cp_bottom.y = ImGui::GetScrollY() + margin; // safety
+		cp_bottom.x = ImGui::GetScrollX() + visible_sz.x - vscroll_w - child_size_zoom.x - 2.0f;
+		if (cp_bottom.x < ImGui::GetScrollX() + margin) cp_bottom.x = ImGui::GetScrollX() + margin;
+		ImGui::SetCursorPos(cp_bottom);
+		if (ImGui::BeginChild(child_id_zoom, child_size_zoom, false, child_flags))
+		{
+			ImGui::PushItemWidth(140.0f);
+			if (ImGui::SliderFloat("##zoom", &zoomAll, -1.0f, 5.0f, "")) { ide_force_rendering_delayed = true; }
+			ImGui::SameLine();
+			if (ImGui::Button("1:1")) { zoomAll = -fRatioAuto + 1.0f; iDelayAction = 1; }
+			ImGui::PopItemWidth();
+			overlay_zoom_hovered = ImGui::IsWindowHovered();
+		}
+		ImGui::EndChild();
+		ImGui::PopStyleVar();
+		ImGui::PopStyleColor();
 
 /* TEST CODE 
 		float centerx = (wso.x) * 0.5f;
@@ -1878,8 +1921,8 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 		}
 */
 
-		ImGuiIO& io = ImGui::GetIO();
-		if (ImGui::IsWindowHovered() && io.MouseWheel != 0.0f) {
+	ImGuiIO& io = ImGui::GetIO();
+	if ((ImGui::IsWindowHovered() || overlay_hovered || overlay_zoom_hovered) && io.MouseWheel != 0.0f) {
 			bool minus = false;
 			float add = io.MouseWheel;
 			ide_force_rendering_delayed = true;
@@ -2412,6 +2455,8 @@ bool MediaScene::Render(const char* aTitle, TextEditor * m_editor, void * pTmp ,
 	}
 
 	ImGui::GetStyle().WindowRounding = (float) iOldRounding;
+	// Balance PushItemFlag(ImGuiItemFlags_NoTabStop, false) made earlier in this function
+	ImGui::PopItemFlag();
 	ImGui::EndChild();
 
 	if (add_new_resolution)
@@ -2547,9 +2592,29 @@ bool MediaScene::DrawAGKSprite(ImTextureID tex_id, ImVec2 center, ImVec2 size, f
 	if (window->SkipItems)
 		return false;
 
-	ImGui::PushID(tex_id);
-	const ImGuiID id = window->GetID("#image");
-	ImGui::PopID();
+	// Scope the item ID by object, texture and pass/state when available to avoid duplicate IDs
+	// This covers cases where a button may draw two images (inactive/active) for the same object
+	// and also when the function is called twice in different passes (e.g., selection vs main draw)
+	ImGuiID id;
+	if (Obj)
+	{
+		ImGui::PushID((void*)Obj);
+		ImGui::PushID(tex_id);
+		// Differentiate selection pass vs main draw pass
+		ImGui::PushID(drawselection ? "sel" : "main");
+		id = window->GetID("#image");
+		ImGui::PopID(); // pass
+		ImGui::PopID(); // tex_id
+		ImGui::PopID(); // Obj
+	}
+	else
+	{
+		ImGui::PushID(tex_id);
+		ImGui::PushID(drawselection ? "sel" : "main");
+		id = window->GetID("#image");
+		ImGui::PopID(); // pass
+		ImGui::PopID();
+	}
 
 	float cos_a = cosf(angle);
 	float sin_a = sinf(angle);
@@ -2688,10 +2753,10 @@ bool MediaScene::DrawAGKSprite(ImTextureID tex_id, ImVec2 center, ImVec2 size, f
 
 
 			ImVec4 clip_rect = { -2000.0f,-2000.0f,8000.0f,8000.0f };
-			if (Obj->m_iFontId > 0 && customfonts[Obj->m_iFontId] && customfonts[Obj->m_iFontId]->FontSize > 0.0f && draw_list) {
+			if (Obj->m_iFontId > 0 && customfonts[Obj->m_iFontId] && customfonts[Obj->m_iFontId]->LegacySize > 0.0f && draw_list) {
 				customfonts[Obj->m_iFontId]->RenderText(draw_list, (size.y + 1.0f), ImVec2(pos[9].x, pos[9].y + 2.0f), ImGui::GetColorU32(drawCol_normal), clip_rect, Obj->m_Text.GetStr(), Obj->m_Text.GetStr() + Obj->m_Text.GetLength());
 			}
-			else if(agkfont->FontSize > 0.0f && draw_list)
+			else if(agkfont->LegacySize > 0.0f && draw_list)
 				agkfont->RenderText(draw_list, (size.y + 1.5f), ImVec2(pos[9].x, pos[9].y - 1.0f), ImGui::GetColorU32(drawCol_normal), clip_rect, Obj->m_Text.GetStr(), Obj->m_Text.GetStr() + Obj->m_Text.GetLength());
 
 			//center
@@ -2780,10 +2845,10 @@ bool MediaScene::DrawAGKSprite(ImTextureID tex_id, ImVec2 center, ImVec2 size, f
 //				draw_list->AddText(agkfont, (size.y + 1.5f ) , ImVec2(pos[9].x , pos[9].y-1.0f ), ImGui::GetColorU32(drawCol_hover), Obj->m_Text.GetStr(), Obj->m_Text.GetStr() + Obj->m_Text.GetLength(), 0.0f, &clipping);
 
 			ImVec4 clip_rect = { -2000.0f,-2000.0f,8000.0f,8000.0f };
-			if (Obj->m_iFontId > 0 && customfonts[Obj->m_iFontId] && customfonts[Obj->m_iFontId]->FontSize > 0.0f && draw_list) {
+			if (Obj->m_iFontId > 0 && customfonts[Obj->m_iFontId] && customfonts[Obj->m_iFontId]->LegacySize > 0.0f && draw_list) {
 				customfonts[Obj->m_iFontId]->RenderText(draw_list, (size.y + 1.0f), ImVec2(pos[9].x, pos[9].y + 2.0f), ImGui::GetColorU32(drawCol_normal), clip_rect, Obj->m_Text.GetStr(), Obj->m_Text.GetStr() + Obj->m_Text.GetLength());
 			}
-			else if (agkfont->FontSize > 0.0f && draw_list)
+			else if (agkfont->LegacySize > 0.0f && draw_list)
 				agkfont->RenderText(draw_list, (size.y + 1.5f), ImVec2(pos[9].x, pos[9].y - 1.0f), ImGui::GetColorU32(drawCol_normal), clip_rect, Obj->m_Text.GetStr(), Obj->m_Text.GetStr() + Obj->m_Text.GetLength());
 
 
@@ -2914,6 +2979,12 @@ bool MediaScene::DrawAGKSprite(ImTextureID tex_id, ImVec2 center, ImVec2 size, f
 				butloop = 4;
 			if (Obj->m_iMediaType == MEDIATYPE_BUTTON || Obj->m_iMediaType == MEDIATYPE_EDITBOX)
 				butloop = 6;
+			// Ensure handle buttons have a unique ID scope per object and draw pass (main/selection)
+			bool pushedHandleScope = false;
+			bool pushedPassScope = false;
+			if (Obj) { ImGui::PushID((void*)Obj); pushedHandleScope = true; }
+			ImGui::PushID(drawselection ? "sel" : "main");
+			pushedPassScope = true;
 			for (int i = 0; i < butloop; i++) {
 				if (butsize < fs*0.4f) //0.75f
 					butsize = fs*0.4f;
@@ -2961,6 +3032,9 @@ bool MediaScene::DrawAGKSprite(ImTextureID tex_id, ImVec2 center, ImVec2 size, f
 				}
 				ImGui::GetStyle().FramePadding = fp;
 			}
+
+			if (pushedPassScope) ImGui::PopID();
+			if (pushedHandleScope) ImGui::PopID();
 
 			style_colors[ImGuiCol_Button] = oldbutN;
 			style_colors[ImGuiCol_ButtonHovered] = oldbutH;
@@ -7274,7 +7348,7 @@ void ProcessSceneManager(MediaScene * m_ActiveScene)
 							tooltip_position.x += tooltip_offset.x;
 							tooltip_position.y += tooltip_offset.y;
 							ImGui::SetNextWindowPos(tooltip_position);
-							ImGui::SetNextWindowContentWidth(204.0f);
+							ImGui::SetNextWindowContentSize(ImVec2(204.0f, 0.0f));
 							ImGui::BeginTooltip();
 							float icon_ratio;
 							int icon_size = 200;
@@ -7382,7 +7456,7 @@ void ProcessSceneManager(MediaScene * m_ActiveScene)
 			}
 
 			float fs = ImGui::GetFontSize();
-			if (m_ActiveScene->customfonts[it->first] && m_ActiveScene->customfonts[it->first]->FontSize > 0.0f) {
+			if (m_ActiveScene->customfonts[it->first] && m_ActiveScene->customfonts[it->first]->LegacySize > 0.0f) {
 				if (!m_ActiveScene->customfonts[it->first]->IsLoaded())
 					ImGui::PushFont(defaultfont);  //defaultfont
 				else
@@ -7396,7 +7470,7 @@ void ProcessSceneManager(MediaScene * m_ActiveScene)
 			ImGui::Text(FontName.GetStr());
 			ImGui::SetWindowFontScale(1.0f);
 
-			if (m_ActiveScene->customfonts[it->first] && m_ActiveScene->customfonts[it->first]->FontSize > 0.0f) {
+			if (m_ActiveScene->customfonts[it->first] && m_ActiveScene->customfonts[it->first]->LegacySize > 0.0f) {
 				ImGui::PopFont();
 			}
 		}
@@ -7824,13 +7898,13 @@ void ProcessSceneManager(MediaScene * m_ActiveScene)
 		//Size
 		float percentx = (m_ActiveScene->fPhysicsGravityX / (float)m_ActiveScene->iBaseWidth)*100.0f;
 		float percenty = (m_ActiveScene->fPhysicsGravityY / (float)m_ActiveScene->iBaseHeight)*100.0f;
-		if (ImGui::InputFloat("Scene Gravity X", &percentx, 1.0f, 10.0f, decimalprecision)) {
+	if (ImGui::InputFloat("Scene Gravity X", &percentx, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 			if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 				m_ActiveScene->m_SceneEditor->filechanged = true;
 			m_ActiveScene->fPhysicsGravityX = (m_ActiveScene->iBaseWidth / 100.0f) * percentx;
 			agk::SetPhysicsGravity((m_ActiveScene->fPhysicsGravityX / (float)m_ActiveScene->iBaseWidth)*100.0f, (m_ActiveScene->fPhysicsGravityY / (float)m_ActiveScene->iBaseHeight)*100.0f);
 		}
-		if (ImGui::InputFloat("Scene Gravity Y", &percenty, 1.0f, 10.0f, decimalprecision)) {
+	if (ImGui::InputFloat("Scene Gravity Y", &percenty, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 			if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 				m_ActiveScene->m_SceneEditor->filechanged = true;
 			m_ActiveScene->fPhysicsGravityY = (m_ActiveScene->iBaseHeight / 100.0f) * percenty;
@@ -7838,12 +7912,12 @@ void ProcessSceneManager(MediaScene * m_ActiveScene)
 		}
 	}
 	else {
-		if (ImGui::InputFloat("Scene Gravity X", &m_ActiveScene->fPhysicsGravityX, 1.0f, 10.0f, decimalprecision)) {
+	if (ImGui::InputFloat("Scene Gravity X", &m_ActiveScene->fPhysicsGravityX, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 			if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 				m_ActiveScene->m_SceneEditor->filechanged = true;
 			agk::SetPhysicsGravity(m_ActiveScene->fPhysicsGravityX, m_ActiveScene->fPhysicsGravityY);
 		}
-		if (ImGui::InputFloat("Scene Gravity Y", &m_ActiveScene->fPhysicsGravityY, 1.0f, 10.0f, decimalprecision)) {
+	if (ImGui::InputFloat("Scene Gravity Y", &m_ActiveScene->fPhysicsGravityY, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 			if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 				m_ActiveScene->m_SceneEditor->filechanged = true;
 			agk::SetPhysicsGravity(m_ActiveScene->fPhysicsGravityX, m_ActiveScene->fPhysicsGravityY);
@@ -7947,15 +8021,15 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 
 		ImGui::Checkbox("Snap To Grid", &w->bSnapToGrid);
 
-		ImGui::InputFloat("Grid X##dm", &w->fGridX, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("Grid X##dm", &w->fGridX, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Value");
-		ImGui::InputFloat("Grid Y##dm", &w->fGridY, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("Grid Y##dm", &w->fGridY, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid Y Value");
 
-		ImGui::InputFloat("Grid X Offset", &m_ActiveScene->fGridXOffset, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("Grid X Offset", &m_ActiveScene->fGridXOffset, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Offset Value");
 
-		ImGui::InputFloat("Grid Y Offset", &m_ActiveScene->fGridYOffset, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("Grid Y Offset", &m_ActiveScene->fGridYOffset, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Offset Value");
 
 		if (w->fGridX < 4.0f)
@@ -7973,7 +8047,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 		diff.x *= w->fScaleToScreenX;
 		diff.y *= w->fScaleToScreenY;
 
-		ImGui::InputFloat("All Sprites X Move Offset", &m_ActiveScene->fGridYOffset, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("All Sprites X Move Offset", &m_ActiveScene->fGridYOffset, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Offset Value");
 */
 
@@ -8124,6 +8198,8 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 					bSelected = true;
 				ImVec2 cp = ImGui::GetCursorPos();
 
+				// Allow subsequent small controls (visibility toggle + opacity slider) to overlap the selectable area without disabling them.
+				ImGui::SetNextItemAllowOverlap();
 				uName = "##Layerselect";
 				uName.AppendInt(layer);
 				if (ImGui::Selectable(uName.GetStr(), bSelected)) {
@@ -8131,17 +8207,17 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 				}
 				cp.y -= fsize*0.15f;
 				ImGui::SetCursorPos(cp);
-				ImGui::SetItemAllowOverlap();
 				uName = "##LayerVisible";
 				uName.AppendInt(layer);
 				ImGui::Indent(fsize*0.5f);
+				ImGui::SetNextItemAllowOverlap();
 				ImGui::ToggleButton(uName.GetStr(), &w->bLayerVisible[layer]);
 				if (ImGui::IsItemHovered()) ImGui::SetTooltip("Layer Visible");
 				ImGui::SameLine();
 				ImGui::PushItemWidth(fsize*6.0f);
-				ImGui::SetItemAllowOverlap();
 				uName = "##LayerOpacity";
 				uName.AppendInt(layer);
+				ImGui::SetNextItemAllowOverlap();
 				ImGui::SliderInt(uName.GetStr(), &w->iLayerOpacity[layer], 0, 255);
 				if (ImGui::IsItemHovered()) ImGui::SetTooltip("Layer Opacity");
 				ImGui::PopItemWidth();
@@ -8155,15 +8231,15 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 
 		ImGui::Checkbox("Snap To Grid",&w->bSnapToGrid);
 		
-		ImGui::InputFloat("Grid X##dm", &w->fGridX, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("Grid X##dm", &w->fGridX, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Value");
-		ImGui::InputFloat("Grid Y##dm", &w->fGridY, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("Grid Y##dm", &w->fGridY, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid Y Value");
 
-		ImGui::InputFloat("Grid X Offset", &m_ActiveScene->fGridXOffset, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("Grid X Offset", &m_ActiveScene->fGridXOffset, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Offset Value");
 
-		ImGui::InputFloat("Grid Y Offset", &m_ActiveScene->fGridYOffset, 0.0f, 0.0f, decimalprecision);
+	ImGui::InputFloat("Grid Y Offset", &m_ActiveScene->fGridYOffset, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Offset Value");
 
 		if (w->fGridX < 4.0f)
@@ -8173,8 +8249,8 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 
 		ImGui::Checkbox("Fit Sprite Size to Grid##dm", &w->bDrawModeFitGrid);
 		if (!w->bDrawModeFitGrid) {
-			ImGui::InputFloat("Draw Size X##dm", &w->fDrawModeSizeX, 0.0f, 0.0f, decimalprecision);
-			ImGui::InputFloat("Draw Size Y##dm", &w->fDrawModeSizeY, 0.0f, 0.0f, decimalprecision);
+			ImGui::InputFloat("Draw Size X##dm", &w->fDrawModeSizeX, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
+			ImGui::InputFloat("Draw Size Y##dm", &w->fDrawModeSizeY, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 			
 		}
 		ImGui::Separator();
@@ -8488,7 +8564,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 							float fs = ImGui::GetFontSize();
 							float scale = (1.0f / (64.0f - fs))*20.0f;
 
-							if (m_ActiveScene->customfonts[it->first] && m_ActiveScene->customfonts[it->first]->FontSize > 0.0f) {
+							if (m_ActiveScene->customfonts[it->first] && m_ActiveScene->customfonts[it->first]->LegacySize > 0.0f) {
 								if (!m_ActiveScene->customfonts[it->first]->IsLoaded())
 									ImGui::PushFont(defaultfont);  //defaultfont
 								else
@@ -8508,7 +8584,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 								o->m_iAgkFontId = 0;
 							}
 							ImGui::SetWindowFontScale(1.0f);
-							if (m_ActiveScene->customfonts[it->first] && m_ActiveScene->customfonts[it->first]->FontSize > 0.0f) {
+							if (m_ActiveScene->customfonts[it->first] && m_ActiveScene->customfonts[it->first]->LegacySize > 0.0f) {
 								ImGui::PopFont();
 							}
 
@@ -8543,11 +8619,11 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 				}
 			}
 			else {
-				if (ImGui::InputFloat("Position X", &o->m_Position.x, 0.1f, 1.0f, decimalprecision)) {
+				if (ImGui::InputFloat("Position X", &o->m_Position.x, 0.1f, 1.0f, fmt_from_precision(decimalprecision))) {
 					if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 						m_ActiveScene->m_SceneEditor->filechanged = true;
 				}
-				if (ImGui::InputFloat("Position Y", &o->m_Position.y, 0.1f, 1.0f, decimalprecision)) {
+				if (ImGui::InputFloat("Position Y", &o->m_Position.y, 0.1f, 1.0f, fmt_from_precision(decimalprecision))) {
 					if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 						m_ActiveScene->m_SceneEditor->filechanged = true;
 				}
@@ -8601,7 +8677,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 			}
 			else {
 				if (o->m_iMediaType == MEDIATYPE_SPRITE || o->m_iMediaType == MEDIATYPE_BUTTON || o->m_iMediaType == MEDIATYPE_EDITBOX) {
-					if (ImGui::InputFloat("Size X", &o->m_Size.x, 0.1f, 1.0f, decimalprecision)) {
+					if (ImGui::InputFloat("Size X", &o->m_Size.x, 0.1f, 1.0f, fmt_from_precision(decimalprecision))) {
 						if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 							m_ActiveScene->m_SceneEditor->filechanged = true;
 						if (o->m_iMediaType == MEDIATYPE_SPRITE) {
@@ -8620,7 +8696,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 					tmplabel = "Size";
 				}
 
-				if (ImGui::InputFloat(tmplabel.GetStr() , &o->m_Size.y, 0.1f, 1.0f, decimalprecision)) {
+				if (ImGui::InputFloat(tmplabel.GetStr() , &o->m_Size.y, 0.1f, 1.0f, fmt_from_precision(decimalprecision))) {
 					if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 						m_ActiveScene->m_SceneEditor->filechanged = true;
 					if (o->m_iMediaType == MEDIATYPE_SPRITE) {
@@ -8656,12 +8732,12 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 				}
 
 				if (o->m_iMediaType == MEDIATYPE_SPRITE) {
-					if (ImGui::InputFloat("Scale X", &o->m_Scale.x, 0.1f, 1.0f, decimalprecision)) {
+					if (ImGui::InputFloat("Scale X", &o->m_Scale.x, 0.1f, 1.0f, fmt_from_precision(decimalprecision))) {
 						if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 							m_ActiveScene->m_SceneEditor->filechanged = true;
 						agk::SetSpriteScale(o->m_iSprite, o->m_Scale.x, o->m_Scale.y);
 					}
-					if (ImGui::InputFloat("Scale Y", &o->m_Scale.y, 0.1f, 1.0f, decimalprecision)) {
+					if (ImGui::InputFloat("Scale Y", &o->m_Scale.y, 0.1f, 1.0f, fmt_from_precision(decimalprecision))) {
 						if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 							m_ActiveScene->m_SceneEditor->filechanged = true;
 						agk::SetSpriteScale(o->m_iSprite, o->m_Scale.x, o->m_Scale.y);
@@ -8798,7 +8874,13 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 				float bw = (imgw)*icon_ratio;
 				float bh = (imgh)*icon_ratio;
 
+				// After updating to Dear ImGui 1.92+ duplicate IDs are reported more strictly.
+				// Up and Down image preview buttons can point to the same underlying image (default button image)
+				// resulting in two visible items with identical ID generated inside ImgBtn (texture id + "#image").
+				// Wrap each call in a unique PushID scope so their final IDs differ even when the source image is the same.
+				ImGui::PushID("BtnUpImg");
 				ImGui::ImgBtn(o->m_iImageId, ImVec2(bw, bh));
+				ImGui::PopID();
 
 				ImGui::SameLine();
 				ImGui::PushItemWidth(icon_size*5);
@@ -8886,7 +8968,9 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 				bw = (imgw)*icon_ratio;
 				bh = (imgh)*icon_ratio;
 
+				ImGui::PushID("BtnDownImg");
 				ImGui::ImgBtn(o->m_iImageDownId, ImVec2(bw, bh));
+				ImGui::PopID();
 
 				ImGui::SameLine();
 				ImGui::PushItemWidth(icon_size * 5);
@@ -9069,6 +9153,8 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 							bSelected = true;
 						ImVec2 cp = ImGui::GetCursorPos();
 
+						// Allow overlap for subsequent visibility toggle + opacity slider controls.
+						ImGui::SetNextItemAllowOverlap();
 						uName = "##Layerselect";
 						uName.AppendInt(layer);
 						if (ImGui::Selectable(uName.GetStr(), bSelected)) {
@@ -9083,17 +9169,17 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 						}
 						cp.y -= fsize*0.15;
 						ImGui::SetCursorPos(cp);
-						ImGui::SetItemAllowOverlap();
 						uName = "##LayerVisible";
 						uName.AppendInt(layer);
 						ImGui::Indent(fsize*0.5);
+						ImGui::SetNextItemAllowOverlap();
 						ImGui::ToggleButton(uName.GetStr(), &w->bLayerVisible[layer]);
 						if (ImGui::IsItemHovered()) ImGui::SetTooltip("Layer Visible");
 						ImGui::SameLine();
 						ImGui::PushItemWidth(fsize*4.0);
-						ImGui::SetItemAllowOverlap();
 						uName = "##LayerOpacity";
 						uName.AppendInt(layer);
+						ImGui::SetNextItemAllowOverlap();
 						ImGui::SliderInt(uName.GetStr(), &w->iLayerOpacity[layer], 0, 255);
 						if (ImGui::IsItemHovered()) ImGui::SetTooltip("Layer Opacity");
 						ImGui::PopItemWidth();
@@ -9178,7 +9264,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 					else {
 						ImGui::PushItemWidth(ImGui::GetFontSize()*4.0f);
 						o->fUVSpeedX *= 100.0f;
-						if (ImGui::InputFloat("UV Speed X", &o->fUVSpeedX, 0.0f, 0.0f, decimalprecision)) {
+						if (ImGui::InputFloat("UV Speed X", &o->fUVSpeedX, 0.0f, 0.0f, fmt_from_precision(decimalprecision))) {
 							if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 								m_ActiveScene->m_SceneEditor->filechanged = true;
 						}
@@ -9188,7 +9274,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 						ImGui::SameLine();
 						o->fUVSpeedY *= 100.0f;
 						ImGui::PushItemWidth(ImGui::GetFontSize()*4.0f);
-						if (ImGui::InputFloat("UV Speed Y", &o->fUVSpeedY, 0.0f, 0.0f, decimalprecision)) {
+						if (ImGui::InputFloat("UV Speed Y", &o->fUVSpeedY, 0.0f, 0.0f, fmt_from_precision(decimalprecision))) {
 							if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 								m_ActiveScene->m_SceneEditor->filechanged = true;
 						}
@@ -9214,9 +9300,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 				if (o->bEnablePhysics) {
 					//Shape.
 
-					ImGui::Text("Shape:");
 					const char* physics_shape_array[] = { "No Shape", "Circle", "Box", "Polygon" };
-					ImGui::SameLine();
 					//ImGui::PushItemWidth(-10);
 					//ImGui::SetCursorPos(ImVec2(input_indent, ImGui::GetCursorPos().y));
 					if (ImGui::Combo("##combophysics_shape", &o->iPhysicsShape, physics_shape_array, IM_ARRAYSIZE(physics_shape_array))) {
@@ -9224,11 +9308,12 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 						if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 							m_ActiveScene->m_SceneEditor->filechanged = true;
 					}
+					ImGui::SameLine();
+					ImGui::Text("Shape");
 					//ImGui::PopItemWidth();
 
-					ImGui::Text("Mode:");
+					
 					const char* physics_mode_array[] = { "Static", "Dynamic", "Kinematic" };
-					ImGui::SameLine();
 					//ImGui::PushItemWidth(-10);
 					//ImGui::SetCursorPos(ImVec2(input_indent, ImGui::GetCursorPos().y));
 					if (ImGui::Combo("##combophysics_mode", &o->iPhysicsMode, physics_mode_array, IM_ARRAYSIZE(physics_mode_array))) {
@@ -9237,6 +9322,9 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 						if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 							m_ActiveScene->m_SceneEditor->filechanged = true;
 					}
+					ImGui::SameLine();
+					ImGui::Text("Mode");
+				
 					//ImGui::PopItemWidth();
 
 					if (ImGui::Checkbox("Can Rotate", &o->bPhysicsCanRotate)) {
@@ -9283,7 +9371,7 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 					if (w->bUsePercentage) {
 						//Size
 						float percentx = (o->fPhysicsMass / (float) w->iBaseWidth)*100.0f;
-						if (ImGui::InputFloat("Mass", &percentx, 1.0f, 10.0f, decimalprecision)) {
+						if (ImGui::InputFloat("Mass", &percentx, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 							if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 								m_ActiveScene->m_SceneEditor->filechanged = true;
 							o->fPhysicsMass = (w->iBaseWidth / 100.0f) * percentx;
@@ -9291,14 +9379,14 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 						}
 
 						percentx = (o->fPhysicsCOMX / (float)w->iBaseWidth)*100.0f;
-						if (ImGui::InputFloat("Mass Center X", &percentx, 0.01f, 0.10f, decimalprecision)) {
+						if (ImGui::InputFloat("Mass Center X", &percentx, 0.01f, 0.10f, fmt_from_precision(decimalprecision))) {
 							if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 								m_ActiveScene->m_SceneEditor->filechanged = true;
 							o->fPhysicsCOMX = (w->iBaseWidth / 100.0f) * percentx;
 							agk::SetSpritePhysicsCOM(o->m_iSprite, (o->fPhysicsCOMX / (float)w->iBaseWidth)*100.0f, (o->fPhysicsCOMY / (float)w->iBaseHeight)*100.0f);
 						}
 						float percenty = (o->fPhysicsCOMY / (float)w->iBaseHeight)*100.0f;
-						if (ImGui::InputFloat("Mass Center Y", &percenty, 0.01f, 0.10f, decimalprecision)) {
+						if (ImGui::InputFloat("Mass Center Y", &percenty, 0.01f, 0.10f, fmt_from_precision(decimalprecision))) {
 							if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 								m_ActiveScene->m_SceneEditor->filechanged = true;
 							o->fPhysicsCOMY = (w->iBaseHeight / 100.0f) * percenty;
@@ -9306,17 +9394,17 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 						}
 					}
 					else {
-						if (ImGui::InputFloat("Mass", &o->fPhysicsMass, 1.0f, 10.0f, decimalprecision)) {
+						if (ImGui::InputFloat("Mass", &o->fPhysicsMass, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 							if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 								m_ActiveScene->m_SceneEditor->filechanged = true;
 							agk::SetSpritePhysicsMass(o->m_iSprite, o->fPhysicsMass);
 						}
-						if (ImGui::InputFloat("Mass Center X", &o->fPhysicsCOMX, 0.01f, 0.10f, decimalprecision)) {
+						if (ImGui::InputFloat("Mass Center X", &o->fPhysicsCOMX, 0.01f, 0.10f, fmt_from_precision(decimalprecision))) {
 							if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 								m_ActiveScene->m_SceneEditor->filechanged = true;
 							agk::SetSpritePhysicsCOM(o->m_iSprite, o->fPhysicsCOMX, o->fPhysicsCOMY);
 						}
-						if (ImGui::InputFloat("Mass Center Y", &o->fPhysicsCOMY, 0.01f, 0.10f, decimalprecision)) {
+						if (ImGui::InputFloat("Mass Center Y", &o->fPhysicsCOMY, 0.01f, 0.10f, fmt_from_precision(decimalprecision))) {
 							if (m_ActiveScene && m_ActiveScene->m_SceneEditor)
 								m_ActiveScene->m_SceneEditor->filechanged = true;
 							agk::SetSpritePhysicsCOM(o->m_iSprite, o->fPhysicsCOMX, o->fPhysicsCOMY);
@@ -9351,20 +9439,20 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 					//Size
 					float percentx = (w->fPhysicsGravityX / (float)w->iBaseWidth)*100.0f;
 					float percenty = (w->fPhysicsGravityY / (float)w->iBaseHeight)*100.0f;
-					if (ImGui::InputFloat("Scene Gravity X", &percentx, 1.0f, 10.0f, decimalprecision)) {
+					if (ImGui::InputFloat("Scene Gravity X", &percentx, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 						w->fPhysicsGravityX = (w->iBaseWidth / 100.0f) * percentx;
 						agk::SetPhysicsGravity((w->fPhysicsGravityX / (float)w->iBaseWidth)*100.0f, (w->fPhysicsGravityY / (float)w->iBaseHeight)*100.0f);
 					}
-					if (ImGui::InputFloat("Scene Gravity Y", &percenty, 1.0f, 10.0f, decimalprecision)) {
+					if (ImGui::InputFloat("Scene Gravity Y", &percenty, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 						w->fPhysicsGravityY = (w->iBaseHeight / 100.0f) * percenty;
 						agk::SetPhysicsGravity((w->fPhysicsGravityX / (float)w->iBaseWidth)*100.0f, (w->fPhysicsGravityY / (float)w->iBaseHeight)*100.0f);
 					}
 				}
 				else {
-					if (ImGui::InputFloat("Scene Gravity X", &w->fPhysicsGravityX, 1.0f, 10.0f, decimalprecision)) {
+					if (ImGui::InputFloat("Scene Gravity X", &w->fPhysicsGravityX, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 						agk::SetPhysicsGravity(w->fPhysicsGravityX, w->fPhysicsGravityY);
 					}
-					if (ImGui::InputFloat("Scene Gravity Y", &w->fPhysicsGravityY, 1.0f, 10.0f, decimalprecision)) {
+					if (ImGui::InputFloat("Scene Gravity Y", &w->fPhysicsGravityY, 1.0f, 10.0f, fmt_from_precision(decimalprecision))) {
 						agk::SetPhysicsGravity(w->fPhysicsGravityX, w->fPhysicsGravityY);
 					}
 				}
@@ -9413,24 +9501,24 @@ void ProcessSceneProperties(MediaScene * m_ActiveScene)
 			ImGui::Checkbox("Snap Resize To Grid", &w->bSnapResizeToGrid);
 
 			ImGui::PushItemWidth(ImGui::GetFontSize()*4.0f);
-			ImGui::InputFloat("Grid X           ", &m_ActiveScene->fGridX, 0.0f, 0.0f, decimalprecision);
+			ImGui::InputFloat("Grid X           ", &m_ActiveScene->fGridX, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 			ImGui::PopItemWidth();
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Value");
 			ImGui::SameLine();
 
 			ImGui::PushItemWidth(ImGui::GetFontSize()*4.0f);
-			ImGui::InputFloat("Grid Y", &m_ActiveScene->fGridY, 0.0f, 0.0f, decimalprecision);
+			ImGui::InputFloat("Grid Y", &m_ActiveScene->fGridY, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 			ImGui::PopItemWidth();
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid Y Value");
 
 			ImGui::PushItemWidth(ImGui::GetFontSize()*4.0f);
-			ImGui::InputFloat("Grid X Offset", &m_ActiveScene->fGridXOffset, 0.0f, 0.0f, decimalprecision);
+			ImGui::InputFloat("Grid X Offset", &m_ActiveScene->fGridXOffset, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 			ImGui::PopItemWidth();
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid X Offset Value");
 			ImGui::SameLine();
 
 			ImGui::PushItemWidth(ImGui::GetFontSize()*4.0f);
-			ImGui::InputFloat("Grid Y Offset", &m_ActiveScene->fGridYOffset, 0.0f, 0.0f, decimalprecision);
+			ImGui::InputFloat("Grid Y Offset", &m_ActiveScene->fGridYOffset, 0.0f, 0.0f, fmt_from_precision(decimalprecision));
 			ImGui::PopItemWidth();
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Change Grid Y Offset Value");
 			

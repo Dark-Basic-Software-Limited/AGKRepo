@@ -3180,6 +3180,13 @@ int ProgramData::ParseDebugType( AGKFunction *pFunction, int stackPtr, int strSt
 
 int ProgramData::ParseDebugArray( AGKFunction *pFunction, int stackPtr, int strStackPtr, stArray *pArray, const char *szDimensions, uString &sValue, int &consumed )
 {
+	// Null check for safety
+	if ( !pArray )
+	{
+		sValue.SetStrUTF8( "<Invalid Array>" );
+		return 1;
+	}
+
 	// szDimensions should look something like "[a][0]" depending on number of dimensions and index types, could also be "[a][0].typeField"
 	uString sRemaining( szDimensions );
 	sRemaining.Trim( " " );
@@ -3259,6 +3266,8 @@ int ProgramData::ParseDebugArray( AGKFunction *pFunction, int stackPtr, int strS
 		else if ( sRemaining.CompareTo( ".length" ) == 0 ) 
 		{
 			sValue.Format( "%d", pArray->m_iLength-1 );
+			consumed += (int)strlen(szDimensions);
+			return 0;
 		}
 		else
 		{
@@ -3689,7 +3698,16 @@ void ProgramData::PrintWatchVariables( AGKVariableWatch *pTargetVar )
 		{
 			uString sFinal, sValue;
 			int consumed = 0;
-			int error = ParseDebugVariable( pFunction, iDebugFramePtr, iDebugStrFramePtr, pTargetVar->sExpression, sValue, consumed );
+			int error = 1;
+			try
+			{
+				error = ParseDebugVariable( pFunction, iDebugFramePtr, iDebugStrFramePtr, pTargetVar->sExpression, sValue, consumed );
+			}
+			catch(...)
+			{
+				sValue.SetStrUTF8( "<Error accessing variable>" );
+				error = 1;
+			}
 			if ( error == 0 && consumed != pTargetVar->sExpression.GetLength() )
 			{
 				sValue.SetStrUTF8( "<Invalid Expression>" );
@@ -3715,7 +3733,16 @@ void ProgramData::PrintWatchVariables( AGKVariableWatch *pTargetVar )
 			else
 			{
 				int consumed = 0;
-				int error = ParseDebugVariable( pFunction, iDebugFramePtr, iDebugStrFramePtr, pVar->sExpression, sValue, consumed );
+				int error = 1;
+				try
+				{
+					error = ParseDebugVariable( pFunction, iDebugFramePtr, iDebugStrFramePtr, pVar->sExpression, sValue, consumed );
+				}
+				catch(...)
+				{
+					sValue.SetStrUTF8( "<Error accessing variable>" );
+					error = 1;
+				}
 				if ( error == 0 && consumed != pVar->sExpression.GetLength() )
 				{
 					sValue.SetStrUTF8( "<Invalid Expression>" );

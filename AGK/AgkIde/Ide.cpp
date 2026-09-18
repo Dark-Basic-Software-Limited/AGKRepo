@@ -63,6 +63,8 @@ using namespace AGK;
 app App;
 
 extern Preferences pref;
+extern int WindowPosX, WindowPosY, WindowMaximized;
+extern int screenWidth, screenHeight;
 
 // Functions
 bool vTextEditor(char *winname, TextEditor * m_editor, char * cName, char * cPath, bool bUseSaveAs = false, cProjectItem::sProjectFiles * m_pCurFile = NULL);
@@ -90,6 +92,8 @@ cProjectItem * pCurrentSelectedProject = NULL;
 cProjectItem * pCurrentSelectedProjectState = NULL;
 cProjectItem * mCompiledProject = NULL;
 cProjectItem * pRepeatRemoveProject = NULL;
+cProjectItem * pQueuedProjectClose = NULL;
+bool bQueuedProjectClose = false;
 cProjectItem * renderingProject;
 
 cFolderItem::sFolderFiles * m_pLastSelectedFile;
@@ -189,20 +193,6 @@ bool add_new_scene = false;
 bool add_new_project_file = false;
 char cLayoutFile[MAX_PATH];
 int set_default_focus = 0;
-
-//Server News System
-int ServerNewsHttp = -1;
-bool ServerNewsRunning = false;
-bool ServerNewsGetImage = false;
-int ServerNewsGetImageId = 0;
-float ServerNewsTimer = 0;
-char *ServerNewsString = NULL;
-uString ServerNews = "";
-uString ServerNewsMsg = "";
-uString ServerNewsUrl = "";
-uString ServerNewsImageUrl = "";
-uString ServerNewsUpdate;
-bool ServerDisplayNewsWindow = false;
 
 // Android export download
 int AndroidExportHTTP = -1;
@@ -393,6 +383,24 @@ void app::Begin(GLFWwindow* window)
 	AgkClearColor[2] = 204;
 
 
+	// Set window position before showing, to avoid rendering glitches on secondary monitors
+#ifdef AGK_WINDOWS
+	if (WindowPosX != 0 || WindowPosY != 0) {
+		// Validate that the saved position is on an available monitor
+		RECT windowRect;
+		windowRect.left = WindowPosX;
+		windowRect.top = WindowPosY;
+		windowRect.right = WindowPosX + screenWidth;
+		windowRect.bottom = WindowPosY + screenHeight;
+		
+		HMONITOR hMonitor = MonitorFromRect(&windowRect, MONITOR_DEFAULTTONULL);
+		if (hMonitor != NULL) {
+			// Monitor exists, set the position
+			SetWindowPos(g_agkhWnd, 0, WindowPosX, WindowPosY, screenWidth, screenHeight, SWP_NOZORDER);
+		}
+	}
+#endif
+
 	if (pref.iIDEUpdateEventSleep) {
 		agk::SetSyncRate(0, 0); // PAUL: drawing on demand instead of at a regular sync rate
 	}
@@ -526,10 +534,9 @@ media/icons/32-pixels/regular/stop.png
 	ImGuiIO& io = ImGui::GetIO(); // (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-	if (pref.iTabHideDropdown)
-		io.ConfigFlags |= ImGuiConfigFlags_DockNoCollapsButton;
-	else
-		io.ConfigFlags &= ~ImGuiConfigFlags_DockNoCollapsButton;
+	// Note: ImGuiConfigFlags_DockNoCollapsButton was removed. If you want to hide the window menu button,
+	// set ImGuiDockNodeFlags_NoWindowMenuButton on your DockSpace or use window flags per-window.
+	(void)pref; // behavior preserved elsewhere
 
 
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -566,6 +573,9 @@ media/icons/32-pixels/regular/stop.png
 	myDarkStyle(NULL); //for bordersize,padding ...
 	myDefaultStyle(NULL); //additional settings before change.
 
+	if (pref.idePalette == 5) {
+		myDarkBlueStyle(NULL);
+	}
 	if (pref.idePalette == 4) {
 		myDarkGreyStyle(NULL);
 	}
@@ -583,7 +593,7 @@ media/icons/32-pixels/regular/stop.png
 			myDefaultStyle(NULL);
 		}
 		else if (pref.bEnableCustomStyle) {
-			HueStyle(NULL); //set Hue style
+			myDefaultStyle(NULL);
 		}
 	}
 	if(pref.bEnableSeedStyle)
@@ -610,6 +620,9 @@ media/icons/32-pixels/regular/stop.png
 			break;
 	}
 
+	if (pref.bEnableCustomStyle) {
+		CustomStyleColors(NULL); //set custom style colors
+	}
 
 	initial_setup = true;
 
@@ -809,36 +822,6 @@ media/icons/32-pixels/regular/stop.png
 		fclose(file);
 	}
 	pUniqueCode[32] = 0;
-
-#ifdef NONEWSSYSTEM
-	ServerNewsRunning = false;
-#else
-	#ifndef DEVVERSION
-		//Start Async code;
-		ServerNewsHttp = agk::CreateHTTPConnection();
-		agk::SetHTTPHost(ServerNewsHttp, "www.thegamecreators.com", 1);
-		char postdata[MAX_PATH];
-		#ifdef AGK_WINDOWS
-			#ifdef DISPLAYCLASSICNEWS
-				sprintf(postdata, "app=agkc&os=windows&k=vIo3sc2z&uid=%s", pUniqueCode);
-			#else
-				sprintf(postdata, "app=agks&os=windows&k=vIo3sc2z&uid=%s", pUniqueCode);
-			#endif
-		#endif
-		#ifdef AGK_MACOS
-			sprintf(postdata, "app=agks&os=mac&k=vIo3sc2z&uid=%s", pUniqueCode);
-		#endif
-		#ifdef AGK_LINUX
-			sprintf(postdata, "app=agks&os=linux&k=vIo3sc2z&uid=%s", pUniqueCode);
-		#endif
-
-		agk::SendHTTPRequestASync(ServerNewsHttp, "api/agk/ide/announcement", postdata);
-		ServerNewsRunning = true;
-		ServerNewsTimer = agk::Timer();
-	#else
-		ServerNewsRunning = false;
-	#endif
-#endif
 
 	//DebugInfo(defaultWriteFolder, "wf:");
 
@@ -1197,86 +1180,6 @@ void ChangeIconSet(void)
 	}
 }
 
-
-void ProcessNewsWindow(void)
-{
-	if (!ServerDisplayNewsWindow)
-		return;
-
-	ImGuiWindowFlags window_flags = 0;
-
-	if (ServerNewsGetImageId > 0)
-		ImGui::SetNextWindowSize(ImVec2(37 * ImGui::GetFontSize(), 27 * ImGui::GetFontSize()), ImGuiCond_Once);
-	else
-		ImGui::SetNextWindowSize(ImVec2(25 * ImGui::GetFontSize(), 13 * ImGui::GetFontSize()), ImGuiCond_Once);
-
-	ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.40f), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
-	ImGui::SetNextWindowViewport(viewport->ID);
-
-	ImGui::Begin("AppGameKit Studio", &ServerDisplayNewsWindow, window_flags);
-
-	ImVec2 ws = ImGui::GetWindowSize();
-	ImVec4* style_colors = ImGui::GetStyle().Colors;
-	ImVec4 oldTextColor = style_colors[ImGuiCol_Text];
-	ImGui::SetWindowFontScale(1.35);
-	style_colors[ImGuiCol_Text] = style_colors[ImGuiCol_PlotHistogram]; ////ImVec4(0.85, 0.0, 0.35, 1.0);
-	ImGui::Spacing();
-	ImGui::Text("News:");
-
-	style_colors[ImGuiCol_Text] = oldTextColor;
-	ImGui::SetWindowFontScale(1.0);
-	ImGui::Separator();
-
-
-	if (ServerNewsGetImageId > 0) {
-		//Display image.
-		float asx = agk::GetImageWidth(ServerNewsGetImageId);
-		float asy = agk::GetImageHeight(ServerNewsGetImageId);
-		float icon_ratio;
-		int icon_size = 36 * ImGui::GetFontSize();
-
-		if ((icon_size / (float)asx) < (icon_size / (float)asy))
-			icon_ratio = icon_size / (float)asx;
-		else
-			icon_ratio = icon_size / (float)asy;
-		float bw = asx*icon_ratio;
-		float bh = asy*icon_ratio;
-
-		if (ImGui::ImgBtn(ServerNewsGetImageId, ImVec2(bw, bh), ImColor(235, 235, 235, 235),ImColor(255, 255, 255, 255)))
-		{
-			//clicked.
-			agk::OpenBrowser(ServerNewsUrl.GetStr());
-		}
-
-	}
-
-	ImGui::TextWrapped("\n%s\n\n",ServerNewsMsg.GetStr());
-//	ImGui::InputText("url:", (char *) ServerNewsUrl.GetStr(), ServerNewsUrl.GetLength(), ImGuiInputTextFlags_ReadOnly);
-	ImGui::Separator();
-	if (ImGui::Button(" Goto Link Page ")) {
-		agk::OpenBrowser(ServerNewsUrl.GetStr());
-	}
-	ImGui::SameLine();
-
-	if (ImGui::Button(" Close ")) {
-		ServerDisplayNewsWindow = false;
-		//Make sure it is not displayed again.
-		char installfile[MAX_PATH];
-		sprintf(installfile, "%sinstallstamp.dat", defaultWriteFolder);
-		FILE* fp = fopen(installfile, "w");
-		if (!fp)
-			fp = AGKfopen(installfile, "w");
-		if (fp) {
-			fwrite(ServerNewsUpdate.GetStr(), 1, 19, fp);
-			fclose(fp);
-		}
-	}
-
-	ImGui::End();
-}
-
-
 ImVec4 clear_color = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);
 ImGuiID dockspaceID = 0;
 ImVec4 my_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -1296,6 +1199,11 @@ extern bool show_additionalfiles_window;
 extern bool show_androidexport_window;
 extern bool show_html5export_window;
 extern bool show_iosexport_window;
+
+// Tools: Color Picker window state
+static bool show_colorpicker_window = false;
+static ImVec4 colorpicker_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+static bool colorpicker_was_opened = false;
 
 
 //###########################################
@@ -1361,238 +1269,6 @@ int app::Loop (void)
 	io.DeltaTime = timeDelta; //PAUL:  set this here instead of in ImGui_ImplAGL_NewFrame()
 
 
-	//News system
-	if (ServerNewsRunning) {
-		//Only check every 1 sec. first time check after 4 sec.
-		if (agk::Timer() - ServerNewsTimer > 4.0) {
-
-			//ServerNewsGetImage
-
-
-			//Check after 1 sec.
-			int ret = agk::GetHTTPResponseReady(ServerNewsHttp);
-			if (ret == -1) {
-				//Failed.
-				ServerNewsRunning = false;
-				agk::CloseHTTPConnection(ServerNewsHttp);
-				agk::DeleteHTTPConnection(ServerNewsHttp);
-			}
-			if (ret > 0) {
-				//Success.
-				ServerNewsString = agk::GetHTTPResponse(ServerNewsHttp);
-
-				agk::CloseHTTPConnection(ServerNewsHttp);
-				agk::DeleteHTTPConnection(ServerNewsHttp);
-
-				ServerNews = ServerNewsString;
-				agk::DeleteString(ServerNewsString);
-				if (ServerNews.FindStr("success", 1) > 0) {
-					//Find update date.
-					int pos = ServerNews.FindStr("\"date\":\"", 1);
-					if (pos > 0) {
-						ServerNews.SubString(ServerNewsUpdate, pos + 8, 19);
-						//Check last news.
-						char installfile[MAX_PATH];
-						sprintf(installfile, "%sinstallstamp.dat", defaultWriteFolder);
-						FILE *file = fopen(installfile, "r");
-						if (!file)
-							file = AGKfopen(installfile, "r");
-
-						char lastdisplay[20];
-						strcpy(lastdisplay, "na");
-						if (file != NULL) {
-							fread(lastdisplay, 1, 19, file);
-							lastdisplay[19] = 0;
-							fclose(file);
-						}
-
-						if (ServerNewsUpdate.CompareCaseTo(lastdisplay) != 0) {
-							//unique display
-							uString tmp;
-							int pos1 = ServerNews.FindStr("message\":\"", 1);
-							int pos2 = ServerNews.FindStr("url\":\"", 1);
-							if (pos1 > 0 && pos2 > 0) {
-								ServerNews.SubString(tmp, pos1 + 10);
-								int pos3 = tmp.FindStr("\",\"", 1);
-								if (pos3 > 0) {
-									tmp.SubString(ServerNewsMsg, 0, pos3);
-									ServerNews.SubString(tmp, pos2 + 6);
-									pos3 = tmp.FindStr("\",\"", 1);
-									if (pos3 > 0) {
-										tmp.SubString(ServerNewsUrl, 0, pos3);
-										ServerNewsUrl.ReplaceStr("\\", "");
-										ServerDisplayNewsWindow = true;
-										ServerNewsGetImageId = agk::LoadImage("media/agk-studio-news-header.png");
-
-										//Checdk if we need to download a image.
-										//ServerNewsImageUrl
-										int pos4 = ServerNews.FindStr("image_url\":", 1);
-										if (pos4 > 0) {
-
-											ServerNews.SubString(tmp, pos4 + 11);
-											int pos3 = tmp.FindStr(",", 1);
-											if (pos3 > 0) {
-												tmp.SubString(ServerNewsImageUrl, 0, pos3);
-
-												
-												if (1 == 2) {
-													//ONLY TEST CODE DO NOT USE!
-
-													//NEED to parse this:
-													ServerNewsImageUrl = "https://www.thegamecreators.com/media/ide/agks/1557927910.png";
-
-													ServerNewsImageUrl.ReplaceStr("\"", "");
-													ServerNewsImageUrl.ReplaceStr("\\", "/");
-													ServerNewsGetImage = true;
-
-													int securehost = 0;
-													uString imgHost;
-													if (ServerNewsImageUrl.FindStr("https", 1) >= 0) {
-														securehost = 1;
-														ServerNewsImageUrl.SubString(imgHost, 6);
-
-													}
-													else {
-														ServerNewsImageUrl.SubString(imgHost, 5);
-													}
-													imgHost.ReplaceStr("//", "");
-
-													int pos6 = imgHost.FindStr("/");
-													if (pos6 >= 0) {
-														tmp = imgHost;
-														tmp.SubString(imgHost, 0, pos6 );
-
-														uString newsimgpath;
-														tmp.SubString(newsimgpath, pos6 + 1);
-
-														ServerNewsHttp = agk::CreateHTTPConnection();
-														agk::SetHTTPHost(ServerNewsHttp, imgHost, securehost);
-														agk::SetRawWritePath(defaultWriteFolder);
-														agk::DeleteFile("fromnews025687.png");
-														agk::DeleteFile("fromnews025687.jpg");
-														if(ServerNewsImageUrl.FindStr(".png",1) >= 0 )
-															agk::GetHTTPFile(ServerNewsHttp, newsimgpath, "fromnews025687.png");
-														else
-															agk::GetHTTPFile(ServerNewsHttp, newsimgpath, "fromnews025687.jpg");
-
-														//Dont display yet wait until image is done downloading.
-														ServerDisplayNewsWindow = false;
-													}
-
-												}
-												else {
-													if (ServerNewsImageUrl.CompareCaseTo("null") == 0) {
-
-														//Just diplay without image.
-														ServerDisplayNewsWindow = true;
-													}
-													else {
-
-														ServerNewsImageUrl.ReplaceStr("\"", "");
-														ServerNewsImageUrl.ReplaceStr("\\", "/");
-														ServerNewsGetImage = true;
-
-														int securehost = 0;
-														uString imgHost;
-														if (ServerNewsImageUrl.FindStr("https", 1) >= 0) {
-															securehost = 1;
-															ServerNewsImageUrl.SubString(imgHost, 6);
-
-														}
-														else {
-															ServerNewsImageUrl.SubString(imgHost, 5);
-														}
-														//PE: Tested using classic image , seams format was a little different so.
-														imgHost.ReplaceStr("////", "");
-														imgHost.ReplaceStr("//", "/");
-
-														int pos6 = imgHost.FindStr("/");
-														if (pos6 >= 0) {
-															tmp = imgHost;
-															tmp.SubString(imgHost, 0, pos6);
-
-															uString newsimgpath;
-															tmp.SubString(newsimgpath, pos6 + 1);
-
-															ServerNewsHttp = agk::CreateHTTPConnection();
-															agk::SetHTTPHost(ServerNewsHttp, imgHost, securehost);
-															agk::SetRawWritePath(defaultWriteFolder);
-															agk::DeleteFile("fromnews025687.png");
-															agk::DeleteFile("fromnews025687.jpg");
-															if (ServerNewsImageUrl.FindStr(".png", 1) >= 0)
-																agk::GetHTTPFile(ServerNewsHttp, newsimgpath, "fromnews025687.png");
-															else
-																agk::GetHTTPFile(ServerNewsHttp, newsimgpath, "fromnews025687.jpg");
-
-															//Dont display yet wait until image is done downloading.
-															ServerDisplayNewsWindow = false;
-														}
-
-													}
-												}
-
-											}
-
-										}
-
-									}
-
-								}
-							}
-
-						}
-						else {
-							//Already seen
-							ServerDisplayNewsWindow = false;
-						}
-
-					}
-				}
-				ServerNewsRunning = false;
-			}
-			ServerNewsTimer = agk::Timer()-3.0;
-		}
-	}
-	else if (ServerNewsGetImage)
-	{
-		//Download image.
-		int ret = agk::GetHTTPFileComplete(ServerNewsHttp);
-		if (ret == -1) {
-			//Failed.
-			ServerNewsRunning = false;
-			agk::CloseHTTPConnection(ServerNewsHttp);
-			agk::DeleteHTTPConnection(ServerNewsHttp);
-
-			//Failed to get image , just display text message.
-			//ServerNewsGetImageId = 0;
-
-			ServerDisplayNewsWindow = true;
-			ServerNewsGetImage = false;
-			agk::SetRawWritePath(agk::GetReadPath());
-
-		}
-		if (ret > 0) {
-			//Image should be ready check.
-
-			if (agk::GetImageExists(ServerNewsGetImageId)) {
-				agk::DeleteImage(ServerNewsGetImageId);
-				ServerNewsGetImageId = 0;
-			}
-
-			if (ServerNewsImageUrl.FindStr(".png", 1) >= 0)
-				ServerNewsGetImageId = agk::LoadImage("fromnews025687.png");
-			else
-				ServerNewsGetImageId = agk::LoadImage("fromnews025687.jpg");
-
-			if (!agk::GetImageExists(ServerNewsGetImageId)) {
-				ServerNewsGetImageId = agk::LoadImage("media/agk-studio-news-header.png");
-			}
-			ServerDisplayNewsWindow = true;
-			ServerNewsGetImage = false;
-			agk::SetRawWritePath(agk::GetReadPath());
-		}
-
-	}
 
 #ifdef AGK_WINDOWS
 
@@ -1865,6 +1541,53 @@ int app::Loop (void)
 	{
 		static bool dockingopen = true;
 
+		// Helper: map Windows VK / legacy key codes to ImGuiKey (ImGui 1.90+)
+		auto VkToImGuiKey = [](int vk) -> ImGuiKey
+		{
+			// Function keys F1..F24 (we only use up to F12)
+			if (vk >= 0x70 && vk <= 0x7B) // VK_F1..VK_F12
+				return (ImGuiKey)((int)ImGuiKey_F1 + (vk - 0x70));
+			// Digits '0'..'9'
+			if (vk >= '0' && vk <= '9')
+				return (ImGuiKey)((int)ImGuiKey_0 + (vk - '0'));
+			// Letters 'A'..'Z'
+			if (vk >= 'A' && vk <= 'Z')
+				return (ImGuiKey)((int)ImGuiKey_A + (vk - 'A'));
+			switch (vk)
+			{
+			case 0x09: return ImGuiKey_Tab;        // VK_TAB
+			case 0x0D: return ImGuiKey_Enter;      // VK_RETURN
+			case 0x1B: return ImGuiKey_Escape;     // VK_ESCAPE
+			case 0x20: return ImGuiKey_Space;      // VK_SPACE
+			case 0x25: return ImGuiKey_LeftArrow;  // VK_LEFT
+			case 0x26: return ImGuiKey_UpArrow;    // VK_UP
+			case 0x27: return ImGuiKey_RightArrow; // VK_RIGHT
+			case 0x28: return ImGuiKey_DownArrow;  // VK_DOWN
+			case 0x21: return ImGuiKey_PageUp;     // VK_PRIOR
+			case 0x22: return ImGuiKey_PageDown;   // VK_NEXT
+			case 0x24: return ImGuiKey_Home;       // VK_HOME
+			case 0x23: return ImGuiKey_End;        // VK_END
+			case 0x2D: return ImGuiKey_Insert;     // VK_INSERT
+			case 0x2E: return ImGuiKey_Delete;     // VK_DELETE
+			case 0x08: return ImGuiKey_Backspace;  // VK_BACK
+			case 0x6B: return ImGuiKey_KeypadAdd;      // VK_ADD (numpad '+')
+			case 0x6D: return ImGuiKey_KeypadSubtract; // VK_SUBTRACT (numpad '-')
+			// OEM keys
+			case 0xBB: return ImGuiKey_Equal;         // VK_OEM_PLUS '=' / '+'
+			case 0xBD: return ImGuiKey_Minus;         // VK_OEM_MINUS
+			case 0xBC: return ImGuiKey_Comma;         // VK_OEM_COMMA
+			case 0xBE: return ImGuiKey_Period;        // VK_OEM_PERIOD
+			case 0xBF: return ImGuiKey_Slash;         // VK_OEM_2
+			case 0xBA: return ImGuiKey_Semicolon;     // VK_OEM_1
+			case 0xDE: return ImGuiKey_Apostrophe;    // VK_OEM_7
+			case 0xDB: return ImGuiKey_LeftBracket;   // VK_OEM_4
+			case 0xDD: return ImGuiKey_RightBracket;  // VK_OEM_6
+			case 0xDC: return ImGuiKey_Backslash;     // VK_OEM_5
+			case 0xC0: return ImGuiKey_GraveAccent;   // VK_OEM_3
+			default: return ImGuiKey_None;
+			}
+		};
+
 		//###################################################
 		//#### Toolbar windows , includes all top menu's ####
 		//###################################################
@@ -1888,7 +1611,7 @@ int app::Loop (void)
 		int iOldRounding = ImGui::GetStyle().WindowRounding;
 		ImGui::GetStyle().WindowRounding = 0.0f;
 
-		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(0, 0) + viewPortPos, ImGuiSetCond_Once);
+		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(0, 0) + viewPortPos, ImGuiCond_Once);
 		ImGui::SetNextWindowSize(ImVec2(ImGui::GetMainViewport()->Size.x, toolbar_size));
 		ImGui::Begin("Toolbar", &dockingopen, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
@@ -1900,7 +1623,7 @@ int app::Loop (void)
 		if (ImGui::GetTime() - lastKeyTime >= 0.125) {
 
 #ifdef AGK_WINDOWS
-			if (ImGui::IsKeyPressed(0x73)) { // 0x73 = F4
+			if (ImGui::IsKeyPressed(ImGuiKey_F4)) {
 				if (io.KeyAlt) {
 #ifdef TRIALVERSIONEXPIRES
 					trialaction = 9;
@@ -1912,7 +1635,7 @@ int app::Loop (void)
 #endif
 //
 			if(!(debug_is_running || remote_debug_is_running)) {
-				if (ImGui::IsKeyPressed(0x7A)) { // 0x7A = F11
+				if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
 					lastKeyTime = (float)ImGui::GetTime();
 
 					if (!agkfullscreen) {
@@ -1933,28 +1656,28 @@ int app::Loop (void)
 						agk::SetRawMouseVisible(1); //count internal windows mouse visible counter up.
 					}
 
-					io.KeysDown[0x7A] = false; //Reset keys.
+					// io.KeysDown[] deprecated in ImGui 1.90+
 					agk::KeyUp(0x7A); //Reset keys.
 				}
 			}
 
-			if (ImGui::IsKeyPressed(0x75)) { // 0x75 = F6
+			if (ImGui::IsKeyPressed(ImGuiKey_F6)) {
 			}
-			if (ImGui::IsKeyPressed(0x77)) { // 0x77 = F8
+			if (ImGui::IsKeyPressed(ImGuiKey_F8)) {
 			}
-			//if (ImGui::IsKeyPressed(0x78)) { // 0x78 = F9
+			//if (ImGui::IsKeyPressed((ImGuiKey)0x78)) { // 0x78 = F9
 			//	pressedFkey = 9;
 			//	lastKeyTime = (float)ImGui::GetTime();
 			//	io.KeysDown[0x78] = false; //Reset keys.
 			//	agk::KeyUp(0x78); //Reset keys.
 			//}
-			if (ImGui::IsKeyPressed(0x79)) { // 0x79 = F10
+			if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
 			}
 			if ((debug_is_running || remote_debug_is_running)) {
-				if (ImGui::IsKeyPressed(0x7A)) { // 0x7A = F11
+				if (ImGui::IsKeyPressed(ImGuiKey_F11)) {
 					pressedFkey = 11;
 					lastKeyTime = (float)ImGui::GetTime();
-					io.KeysDown[0x7A] = false; //Reset keys.
+					// io.KeysDown[] deprecated in ImGui 1.90+
 					agk::KeyUp(0x7A); //Reset keys.
 				}
 			}
@@ -1974,74 +1697,74 @@ int app::Loop (void)
 				alt = io.KeyAlt;
 			}
 			//PE: Special +- 187,189 now set to respect preferences shortcut setting for shift,alt,ctrl.
-			if (ctrl == pref.bZoomInCtrl && shift == pref.bZoomInShift && alt == pref.bZoomInAlt && ( ImGui::IsKeyPressed(pref.iZoomInKey) || ImGui::IsKeyPressed(187)) ) {
+			if (ctrl == pref.bZoomInCtrl && shift == pref.bZoomInShift && alt == pref.bZoomInAlt && ( ImGui::IsKeyPressed(VkToImGuiKey(pref.iZoomInKey)) || ImGui::IsKeyPressed(ImGuiKey_Equal)) ) {
 				pressedCTRLkey = '+';
 				lastKeyTime = (float)ImGui::GetTime();
 			}
-			if (ctrl == pref.bZoomOutCtrl && shift == pref.bZoomOutShift && alt == pref.bZoomOutAlt && ( ImGui::IsKeyPressed(pref.iZoomOutKey) || ImGui::IsKeyPressed(189)) ) {
+			if (ctrl == pref.bZoomOutCtrl && shift == pref.bZoomOutShift && alt == pref.bZoomOutAlt && ( ImGui::IsKeyPressed(VkToImGuiKey(pref.iZoomOutKey)) || ImGui::IsKeyPressed(ImGuiKey_Minus)) ) {
 				pressedCTRLkey = '-';
 				lastKeyTime = (float)ImGui::GetTime();
 			}
-			if (ctrl == pref.bGotoLineCtrl && shift == pref.bGotoLineShift && alt == pref.bGotoLineAlt && ImGui::IsKeyPressed(pref.iGotoLineKey)) {
+			if (ctrl == pref.bGotoLineCtrl && shift == pref.bGotoLineShift && alt == pref.bGotoLineAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iGotoLineKey))) {
 				pressedCTRLkey = 'L';
 				lastKeyTime = (float)ImGui::GetTime();
 			}
 
-			if (ctrl == pref.bRunCtrl && shift == pref.bRunShift && alt == pref.bRunAlt && ImGui::IsKeyPressed(pref.iRunKey)) {
+			if (ctrl == pref.bRunCtrl && shift == pref.bRunShift && alt == pref.bRunAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iRunKey))) {
 				pressedFkey = 5;
 				lastKeyTime = (float)ImGui::GetTime();
-				io.KeysDown[pref.iRunKey] = false; //Reset keys.
+				// io.KeysDown[] deprecated in ImGui 1.90+
 				agk::KeyUp(pref.iRunKey); //Reset keys.
 			}
 
-			if (ctrl == pref.bCompileCtrl && shift == pref.bCompileShift && alt == pref.bCompileAlt && ImGui::IsKeyPressed(pref.iCompileKey)) {
+			if (ctrl == pref.bCompileCtrl && shift == pref.bCompileShift && alt == pref.bCompileAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iCompileKey))) {
 				pressedFkey = 7;
 				lastKeyTime = (float)ImGui::GetTime();
-				io.KeysDown[pref.iCompileKey] = false; //Reset keys.
+				// io.KeysDown[] deprecated in ImGui 1.90+
 				agk::KeyUp(pref.iCompileKey); //Reset keys.
 			}
 
-			if (ctrl == pref.bBroadCastCtrl && shift == pref.bBroadCastShift && alt == pref.bBroadCastAlt && ImGui::IsKeyPressed(pref.iBroadCastKey)) {
+			if (ctrl == pref.bBroadCastCtrl && shift == pref.bBroadCastShift && alt == pref.bBroadCastAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iBroadCastKey))) {
 				pressedFkey = 6;
 				lastKeyTime = (float)ImGui::GetTime();
-				io.KeysDown[pref.iBroadCastKey] = false; //Reset keys.
+				// io.KeysDown[] deprecated in ImGui 1.90+
 				agk::KeyUp(pref.iBroadCastKey); //Reset keys.
 			}
 
-			if (ctrl == pref.bDebugCtrl && shift == pref.bDebugShift && alt == pref.bDebugAlt && ImGui::IsKeyPressed(pref.iDebugKey)) {
+			if (ctrl == pref.bDebugCtrl && shift == pref.bDebugShift && alt == pref.bDebugAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iDebugKey))) {
 				pressedFkey = 8;
 				lastKeyTime = (float)ImGui::GetTime();
-				io.KeysDown[pref.iDebugKey] = false; //Reset keys.
+				// io.KeysDown[] deprecated in ImGui 1.90+
 				agk::KeyUp(pref.iDebugKey); //Reset keys.
 			}
 
 
-			if (ctrl == pref.bDebugStepCtrl && shift == pref.bDebugStepShift && alt == pref.bDebugStepAlt && ImGui::IsKeyPressed(pref.iDebugStepKey)) {
+			if (ctrl == pref.bDebugStepCtrl && shift == pref.bDebugStepShift && alt == pref.bDebugStepAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iDebugStepKey))) {
 				pressedFkey = 10;
 				lastKeyTime = (float)ImGui::GetTime();
-				io.KeysDown[pref.iDebugStepKey] = false; //Reset keys.
+				// io.KeysDown[] deprecated in ImGui 1.90+
 				agk::KeyUp(pref.iDebugStepKey); //Reset keys.
 			}
 			if (debug_is_running || remote_debug_is_running) {
-				if (ctrl == pref.bDebugStepCtrl && shift && alt == pref.bDebugStepAlt && ImGui::IsKeyPressed(pref.iDebugStepKey)) {
+				if (ctrl == pref.bDebugStepCtrl && shift && alt == pref.bDebugStepAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iDebugStepKey))) {
 					pressedFkey = 10;
 					lastKeyTime = (float)ImGui::GetTime();
-					io.KeysDown[pref.iDebugStepKey] = false; //Reset keys.
+					// io.KeysDown[] deprecated in ImGui 1.90+
 					agk::KeyUp(pref.iDebugStepKey); //Reset keys.
 				}
 			}
 
-			if (ctrl == pref.bOpenFileCtrl && shift == pref.bOpenFileShift && alt == pref.bOpenFileAlt && ImGui::IsKeyPressed(pref.iOpenFileKey)) {
+			if (ctrl == pref.bOpenFileCtrl && shift == pref.bOpenFileShift && alt == pref.bOpenFileAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iOpenFileKey))) {
 				pressedCTRLkey = 'O';
 				lastKeyTime = (float)ImGui::GetTime();
-				io.KeysDown[pref.iOpenFileKey] = false; //Reset keys.
+				// io.KeysDown[] deprecated in ImGui 1.90+
 				agk::KeyUp(pref.iOpenFileKey); //Reset keys.
 			}
 
-			if (ctrl == pref.bOpenProjectCtrl && shift == pref.bOpenProjectShift && alt == pref.bOpenProjectAlt && ImGui::IsKeyPressed(pref.iOpenProjectKey)) {
+			if (ctrl == pref.bOpenProjectCtrl && shift == pref.bOpenProjectShift && alt == pref.bOpenProjectAlt && ImGui::IsKeyPressed(VkToImGuiKey(pref.iOpenProjectKey))) {
 				pressedCTRLkey = 'P';
 				lastKeyTime = (float)ImGui::GetTime();
-				io.KeysDown[pref.iOpenProjectKey] = false; //Reset keys.
+				// io.KeysDown[] deprecated in ImGui 1.90+
 				agk::KeyUp(pref.iOpenProjectKey); //Reset keys.
 			}
 
@@ -2054,7 +1777,7 @@ int app::Loop (void)
 				//	pressedCTRLkey = '-';
 				//	lastKeyTime = (float)ImGui::GetTime();
 				//}
-				if (ImGui::IsKeyPressed(9)) { //9 = tab.
+				if (ImGui::IsKeyPressed(ImGuiKey_Tab)) { //9 = tab.
 					pressedCTRLkey = '\t';
 					lastKeyTime = (float)ImGui::GetTime();
 				}
@@ -3040,6 +2763,20 @@ int app::Loop (void)
 					}
 				}
 
+				// New: Save All (placed after "Save As")
+				if (ImGui::MenuItem("Save All"))
+				{
+					if (allProjects)
+					{
+						cProjectItem * searchProject = allProjects;
+						while (searchProject)
+						{
+							SaveAllEditedProjectFiles(searchProject);
+							searchProject = searchProject->m_pNext;
+						}
+					}
+				}
+
 				ImGui::Separator();
 
 				bool pactive = true;
@@ -3096,7 +2833,7 @@ int app::Loop (void)
 #endif
 					//Quit code.
 				}
-				ImGui::Separator();
+				
 				ImGui::EndMenu();
 
 			}
@@ -3141,7 +2878,7 @@ int app::Loop (void)
 					if (ImGui::MenuItem("Preferences", nullptr, nullptr)) {
 						pref.show_preferences_window = true;
 					}
-					ImGui::Separator();
+					
 					ImGui::EndMenu();
 				}
 
@@ -3179,7 +2916,7 @@ int app::Loop (void)
 
 					ImGui::Separator();
 
-					if (ImGui::MenuItem("Select all", nullptr, nullptr))
+					if (ImGui::MenuItem("Select All", nullptr, nullptr))
 						if (m_ActiveEditor) m_ActiveEditor->SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(m_ActiveEditor->GetTotalLines(), 0));
 
 					ImGui::Separator();
@@ -3187,7 +2924,7 @@ int app::Loop (void)
 					if (ImGui::MenuItem("Preferences", nullptr, nullptr)) {
 						pref.show_preferences_window = true;
 					}
-					ImGui::Separator();
+					
 					ImGui::EndMenu();
 				}
 			}
@@ -3218,12 +2955,10 @@ int app::Loop (void)
 				//if (ImGui::MenuItem("Go to Previous Mark")) {
 				//}
 
-				ImGui::Separator();
-
 				if (ImGui::MenuItem("Go to Line", pref.cGotoLineText)) {
 					show_gotoline_window = true;
 				}
-				ImGui::Separator();
+				
 				ImGui::EndMenu();
 			}
 
@@ -3262,17 +2997,6 @@ int app::Loop (void)
 						strcpy(pref.cCustomEditorFont, "");
 					}
 
-					ImGui::Separator();
-
-					if (ImGui::SliderInt("IDE Font Size", &pref.iIDEFontSize, 8, 64))
-					{
-						//This will change the position of the menu, so
-						//if (changefonttype == 0)
-						//	changefonttype = 99;
-					}
-					if (ImGui::MenuItem("IDE: Set Font Size")) {
-						changefonttype = 999;
-					}
 					ImGui::EndMenu();
 				}
 
@@ -3281,20 +3005,16 @@ int app::Loop (void)
 					extern bool bEnableSeedStyleChanged;
 					if (ImGui::MenuItem("Default Style")) {
 						pref.bEnableSeedStyle = false;
+						pref.bEnableCustomStyle = false;
 						bEnableSeedStyleChanged = true;
 						myDefaultStyle(NULL);
 						ide_force_rendering_delayed = true;
 						pref.idePalette = 0;
 					}
-					if (ImGui::MenuItem("Dark Style")) {
-						pref.bEnableSeedStyle = false;
-						bEnableSeedStyleChanged = true;
-						myDarkStyle(NULL);
-						ide_force_rendering_delayed = true;
-						pref.idePalette = 1;
-					}
+					
 					if (ImGui::MenuItem("Classic Style")) {
 						pref.bEnableSeedStyle = false;
+						pref.bEnableCustomStyle = false;
 						bEnableSeedStyleChanged = true;
 						ImGui::StyleColorsClassic();
 						ide_force_rendering_delayed = true;
@@ -3303,13 +3023,34 @@ int app::Loop (void)
 
 					if (ImGui::MenuItem("Light Style")) {
 						pref.bEnableSeedStyle = false;
+						pref.bEnableCustomStyle = false;
 						bEnableSeedStyleChanged = true;
 						myLightStyle(NULL);
 						ide_force_rendering_delayed = true;
 						pref.idePalette = 3;
 					}
+					
+					if (ImGui::MenuItem("Dark Style")) {
+						pref.bEnableSeedStyle = false;
+						pref.bEnableCustomStyle = false;
+						bEnableSeedStyleChanged = true;
+						myDarkStyle(NULL);
+						ide_force_rendering_delayed = true;
+						pref.idePalette = 1;
+					}
+
+					if (ImGui::MenuItem("Dark Blue Style")) {
+						pref.bEnableSeedStyle = false;
+						pref.bEnableCustomStyle = false;
+						bEnableSeedStyleChanged = true;
+						myDarkBlueStyle(NULL);
+						ide_force_rendering_delayed = true;
+						pref.idePalette = 5;
+					}
+
 					if (ImGui::MenuItem("Dark Grey Style")) {
 						pref.bEnableSeedStyle = false;
+						pref.bEnableCustomStyle = false;
 						bEnableSeedStyleChanged = true;
 						myDarkGreyStyle(NULL);
 						ide_force_rendering_delayed = true;
@@ -3531,7 +3272,7 @@ int app::Loop (void)
 					pref.iEditorFontSize = 15;
 					changefonttype = 999;
 				}
-				ImGui::Separator();
+				
 				ImGui::EndMenu();
 			}
 
@@ -3712,12 +3453,11 @@ int app::Loop (void)
 					}
 				}
 
-				ImGui::Separator();
+				//if (ImGui::MenuItem("Build Options")) {
+				//	pref.show_preferences_window = true;
+				//}
+				//ImGui::Separator();
 
-//				if (ImGui::MenuItem("Build Options")) {
-//					pref.show_preferences_window = true;
-//				}
-				ImGui::Separator();
 				ImGui::EndMenu();
 			}
 
@@ -3729,6 +3469,13 @@ int app::Loop (void)
 						iWordCount = m_ActiveEditor->WordCount();
 						delaydialog = 4;
 					}
+				}
+
+				ImGui::Separator();
+
+				// Color Picker
+				if (ImGui::MenuItem("Color Picker...")) {
+					show_colorpicker_window = true;
 				}
 
 				ImGui::Separator();
@@ -3764,7 +3511,6 @@ int app::Loop (void)
 				//if (ImGui::MenuItem("<IOS>Export AGK Player")) {
 				//}
 
-				ImGui::Separator();
 				ImGui::EndMenu();
 			}
 
@@ -3846,6 +3592,7 @@ int app::Loop (void)
 					processhelp((char*)"media/Help/commands.html", true);
 					ImGui::SetWindowFocus( ICON_MD_HELP " Help");
 				}
+
 				if (ImGui::MenuItem("Help Home")) {
 					pref.bDisplayHelpWindow = true;
 					processhelp((char*)"media/Help/home.html", true);
@@ -3862,10 +3609,8 @@ int app::Loop (void)
 				if (ImGui::MenuItem("AppGameKit Website")) {
 					agk::OpenBrowser("https://www.appgamekit.com/");
 				}
-                
-#ifndef AGK_MACOS
-				if (ImGui::MenuItem("TheGameCreators Website")) {
-					agk::OpenBrowser("https://www.thegamecreators.com/");
+				if (ImGui::MenuItem("AppGameKit GitHub Respository")) {
+					agk::OpenBrowser("https://github.com/Dark-Basic-Software-Limited/AGKRepo/");
 				}
 				if (ImGui::MenuItem("Community Forum")) {
 					agk::OpenBrowser("https://forum.thegamecreators.com/");
@@ -3884,11 +3629,12 @@ int app::Loop (void)
 				if (ImGui::MenuItem("AppGameKit Player for Android")) {
 					agk::OpenBrowser("https://play.google.com/store/apps/details?id=com.thegamecreators.agk_player2");
 				}
+				#ifdef AGK_MACOS
 				if (ImGui::MenuItem("AppGameKit Player for IOS")) {
 					agk::OpenBrowser("https://itunes.apple.com/us/app/appgamekit-player/id1071731293?mt=8");
 				}
-#endif
-                
+				#endif
+
 #ifdef TRIALVERSIONEXPIRES
 				ImGui::Separator();
 				if (ImGui::MenuItem("Upgrade To Full Version")) {
@@ -3912,7 +3658,7 @@ int app::Loop (void)
 
 				ImGui::EndMenu();
 			}
-			ImGui::Separator();
+			
 			ImGui::EndMenuBar();
 		}
 		ImGui::End();
@@ -3944,7 +3690,7 @@ int app::Loop (void)
 			ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
 			ImGui::DockBuilderRemoveNode(dockspace_id); // Clear out existing layout
 			//ImGui::DockBuilderAddNode(dockspace_id, viewport->Size); // Add empty node
-			ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_Dockspace ); // Add empty node
+			ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace ); // Add empty node
 			ImGui::DockBuilderSetNodePos(dockspace_id, viewport->Pos + ImVec2(0, toolbar_size) );
 			ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size - ImVec2(0, toolbar_size) );
 
@@ -4010,7 +3756,10 @@ int app::Loop (void)
 		//static ImGuiDockNodeFlags opt_flags = ImGuiDockNodeFlags_None;
 		//ImGuiTabBarFlags_NoTabListPopupButton
 		//ImGuiDockNodeFlags_AutoHideTabBar , dont work many errors.
-		ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+		ImGuiDockNodeFlags dock_flags = ImGuiDockNodeFlags_None;
+		if (pref.iTabHideDropdown)
+			dock_flags |= ImGuiDockNodeFlags_NoWindowMenuButton;
+		ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dock_flags);
 		ImGui::End();
 		if (dock_main_tabs == 0)
 			dock_main_tabs = dockspace_id;
@@ -4031,7 +3780,7 @@ int app::Loop (void)
 			//Show Trial dialog.
 			ImGui::SetNextWindowSize(ImVec2(30 * ImGui::GetFontSize(), 27 * ImGui::GetFontSize()), ImGuiCond_Once);
 
-//			ImGui::SetNextWindowPosCenter(ImGuiCond_Once);
+//			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
 
 			ImGuiViewport* viewport = ImGui::GetMainViewport();
 			ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.40f), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
@@ -4109,7 +3858,7 @@ int app::Loop (void)
 		extern bool trialexpired;
 		if (trialexpired && agk::Timer() > 5.0 ) {
 			//ImGui::SetNextWindowSize(ImVec2(340, 300), ImGuiCond_FirstUseEver);
-			//ImGui::SetNextWindowPosCenter(ImGuiCond_Once);
+			//ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
 
 			if (!agk::GetImageExists(trial_logo)) {
 				trial_logo = agk::LoadImage("media/trial.png");
@@ -4118,7 +3867,7 @@ int app::Loop (void)
 			//Show Trial dialog.
 			ImGui::SetNextWindowSize(ImVec2(30 * ImGui::GetFontSize(), 27 * ImGui::GetFontSize()), ImGuiCond_Once);
 
-			//			ImGui::SetNextWindowPosCenter(ImGuiCond_Once);
+			//			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
 
 			ImGuiViewport* viewport = ImGui::GetMainViewport();
 			ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.40f), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
@@ -4184,7 +3933,7 @@ int app::Loop (void)
 		//#### Process Scene Manager ####
 		//###############################
 
-		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(200, 200) + viewPortPos, ImGuiSetCond_Once);
+		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(200, 200) + viewPortPos, ImGuiCond_Once);
 		if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(200, 300));
 		//if (bUseDockFamily)
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
@@ -4203,7 +3952,7 @@ int app::Loop (void)
 		//#### Process Help ####
 		//######################
 
-		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(200, 200) + viewPortPos, ImGuiSetCond_Once);
+		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(200, 200) + viewPortPos, ImGuiCond_Once);
 		if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(200, 300));
 		//if (bUseDockFamily)
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
@@ -4221,7 +3970,7 @@ int app::Loop (void)
 		//###########################################
 
 		if (m_ActiveScene && pref.bDisplaySceneProperties  && iRenderedScenes > 0 ) {
-			if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(200, 200) + viewPortPos, ImGuiSetCond_Once);
+			if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(200, 200) + viewPortPos, ImGuiCond_Once);
 			if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(40, 40));
 			ImGui::Begin("Properties", &pref.bDisplaySceneProperties, 0);
 			//		//ImGui::Text("Properties");
@@ -4240,19 +3989,17 @@ int app::Loop (void)
 					code_properties_open_time = agk::Timer();
 
 				if (agk::Timer() - code_properties_open_time < 4.0) {
-					if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(200, 200) + viewPortPos, ImGuiSetCond_Once);
+					if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(200, 200) + viewPortPos, ImGuiCond_Once);
 					if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(40, 40));
 					static int ofidc = -1;
 					ImGui::Begin("Code Properties", &dockingopen, 0);
 
 					ImGuiWindow* window = ImGui::GetCurrentWindow();
-					//window->FocusIdxAllRequestNext
 					ProcessCodeProperties();
-					if (code_properties_first_run || (!ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() && ofidc != window->FocusIdxAllCounter)) {
-						//ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
+					if (code_properties_first_run || (!ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() && ofidc != window->FocusOrder)) {
 						m_ActiveEditor->mScrollToCursor = true;
 						if(!code_properties_first_run)
-							ofidc = window->FocusIdxAllCounter;
+							ofidc = window->FocusOrder;
 					}
 					ImGui::End();
 					code_properties_first_run = false;
@@ -4269,12 +4016,11 @@ int app::Loop (void)
 		//#### Process Preferences Window, Goto Line windows ... ####
 		//###########################################################
 
-
-		ProcessNewsWindow();
-
 		//if (bUseDockFamily)
+		
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
 		ProcessPreferences();
+	
 		//if (bUseDockFamily)
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
 		ProcessGotoLine();
@@ -4295,7 +4041,67 @@ int app::Loop (void)
 
 		//if (bUseDockFamily)
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
-		ProcessIOSExport();
+				ProcessIOSExport();
+
+				// Tools: Color Picker window
+				if (show_colorpicker_window)
+				{
+					// Set default size on first use (ImGui will ignore if layout already has it)
+					if (!colorpicker_was_opened)
+					{
+						ImGui::SetNextWindowSize(ImVec2(250.0f, 290.0f), ImGuiCond_FirstUseEver);
+						const ImGuiViewport* vp = ImGui::GetMainViewport();
+						ImVec2 center(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + vp->Size.y * 0.5f);
+						ImGui::SetNextWindowPos(center, ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+					}
+					// Rely on ImGui .ini/.layout persistence (agkide.layout)
+					if (ImGui::Begin("Color Picker", &show_colorpicker_window, ImGuiWindowFlags_NoDocking))
+					{
+						colorpicker_was_opened = true;
+
+						// Show built-in hex input (no extra options popup)
+						ImGui::ColorPicker3("##picker", &colorpicker_color.x);
+						//ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_NoOptions);
+
+						// Build hex only when inserting into editor
+						 if (ImGui::Button("Insert HEX"))
+						{
+							if (m_ActiveEditor && !m_ActiveEditor->IsReadOnly())
+							{
+								int r = (int)(colorpicker_color.x * 255.0f + 0.5f); r = r < 0 ? 0 : (r > 255 ? 255 : r);
+								int g = (int)(colorpicker_color.y * 255.0f + 0.5f); g = g < 0 ? 0 : (g > 255 ? 255 : g);
+								int b = (int)(colorpicker_color.z * 255.0f + 0.5f); b = b < 0 ? 0 : (b > 255 ? 255 : b);
+								char hexbuf[16];
+								sprintf(hexbuf, "#%02X%02X%02X", r, g, b);
+								m_ActiveEditor->InsertTextDirectly(hexbuf);
+							}
+						}
+
+						// Build RGB only when inserting into editor
+						ImGui::SameLine();
+						if (ImGui::Button("Insert RGB"))
+						{
+							if (m_ActiveEditor && !m_ActiveEditor->IsReadOnly())
+							{
+								// Convert float [0,1] color components to integer [0,255]
+								int r = (int)(colorpicker_color.x * 255.0f + 0.5f); r = r < 0 ? 0 : (r > 255 ? 255 : r);
+								int g = (int)(colorpicker_color.y * 255.0f + 0.5f); g = g < 0 ? 0 : (g > 255 ? 255 : g);
+								int b = (int)(colorpicker_color.z * 255.0f + 0.5f); b = b < 0 ? 0 : (b > 255 ? 255 : b);
+								char rgbbuf[16];
+								sprintf(rgbbuf, "%d,%d,%d", r, g, b);
+								m_ActiveEditor->InsertTextDirectly(rgbbuf);
+							}
+						}
+
+						ImGui::SameLine();
+						if (ImGui::Button("Close"))
+						{
+							show_colorpicker_window = false;
+							colorpicker_was_opened = false;
+						}
+					}
+					ImGui::End();
+				}
 
 		//Additional Files Dialog.
 		ProcessAdditionalFiles();
@@ -4305,7 +4111,7 @@ int app::Loop (void)
 		//#### Media preview window ####
 		//##############################
 
-		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(250, 250) + viewPortPos, ImGuiSetCond_Once);
+		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(250, 250) + viewPortPos, ImGuiCond_Once);
 		if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(300, 200));
 		//if (bUseDockFamily)
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
@@ -4329,7 +4135,7 @@ int app::Loop (void)
 		//#### Media files , display files using thumbnails. ####
 		//#######################################################
 
-		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(300, 300) + viewPortPos, ImGuiSetCond_Once);
+		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(300, 300) + viewPortPos, ImGuiCond_Once);
 		if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(300, 200));
 		//if (bUseDockFamily)
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
@@ -4425,7 +4231,7 @@ int app::Loop (void)
 #ifdef RENDERTARGET
 		if (agk::GetImageExists(renderTarget)) {
 
-			if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(100, 100)+ viewPortPos, ImGuiSetCond_Once);
+			if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(100, 100)+ viewPortPos, ImGuiCond_Once);
 			if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(640, 480));
 			//if (bUseDockFamily)
 			//	ImGui::SetNextWindowDockFamily(&editorfamily);
@@ -4462,7 +4268,7 @@ int app::Loop (void)
 
 				//ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.00f)); //Change color of imagebuttom background to nothing.
 				ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
-				ImGui::ImageButton((void*)myTextureID, ImVec2(render_target_window_size.x, render_target_window_size.y), ImVec2(0, 0), ImVec2(1, 1), -5, ImVec4(AgkClearColor[0] * toOne, AgkClearColor[1] * toOne, AgkClearColor[2] * toOne, 1), ImVec4(1, 1, 1, 1)); //No window move in game area.
+				ImGui::ImageButton("##render_target", ImTextureRef((ImTextureID)(intptr_t)myTextureID), ImVec2(render_target_window_size.x, render_target_window_size.y), ImVec2(0, 0), ImVec2(1, 1), ImVec4(AgkClearColor[0] * toOne, AgkClearColor[1] * toOne, AgkClearColor[2] * toOne, 1), ImVec4(1, 1, 1, 1)); //No window move in game area.
 				ImGui::PopStyleVar();
 				//ImGui::PopStyleColor(); //Get old colors back.
 
@@ -4507,7 +4313,7 @@ int app::Loop (void)
 		//#### Project window , display all open projects. ####
 		//#####################################################
 
-		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(10, 10)+ viewPortPos, ImGuiSetCond_Once); // undock window.
+		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(10, 10)+ viewPortPos, ImGuiCond_Once); // undock window.
 		if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(200, 300));
 		//if (bUseDockFamily)
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
@@ -4625,15 +4431,7 @@ int app::Loop (void)
 
 					m_pCurrentFile = firstProjects->m_pFirstFile;
 
-					if (firstProjects->m_bDisplayUnfolded || set_default_focus == 10 ) {
-						//Only open all nodes first time.
-						firstProjects->m_bDisplayUnfolded = false;
-						ImGui::SetNextTreeNodeOpen(true);
-					}
-					if (firstProjects->m_bDisplayCollapsed) {
-						ImGui::SetNextTreeNodeOpen(false);
-						firstProjects->m_bDisplayCollapsed = false;
-					}
+					ImGui::SetNextItemOpen(firstProjects->m_bDisplayUnfolded);
 
 
 					if (pCurrentSelectedProject->m_sProjectFile.GetStr() == firstProjects->m_sProjectFile.GetStr())
@@ -4642,6 +4440,8 @@ int app::Loop (void)
 						node_flags &= ~ImGuiTreeNodeFlags_Selected;
 
 					bool TreeNodeOpen = ImGui::TreeNodeEx((void*)(intptr_t)firstProjects->m_id, node_flags, ICON_MD_FOLDER " %s", firstProjects->m_sProjectFile.GetStr());
+
+					firstProjects->m_bDisplayUnfolded = TreeNodeOpen;
 
 					if (ImGui::BeginPopupContextItemAGK()) //"project context menu"
 					{
@@ -4708,9 +4508,9 @@ int app::Loop (void)
 								m_pSelectedFile = NULL;
 							}
 
-							if (firstProjects) SaveProjectFile(firstProjects);
-							if (firstProjects) RemoveProject(firstProjects);
-							setVisibleProjectsInAssetBrowser();
+							pQueuedProjectClose = firstProjects;
+							bQueuedProjectClose = true;
+
 							ImGui::EndPopup();
 							if (TreeNodeOpen) ImGui::TreePop();
 							break;
@@ -4862,17 +4662,16 @@ int app::Loop (void)
 
 											//Open file in editor.
 											vTextEditorInit(m_pSearchFile->m_editor, (char *)m_pSearchFile->m_sFullPath.GetStr());
-											m_pSearchFile->m_bOpenForEdit = true;
-											cNextWindowFocus = (char *)m_pSearchFile->m_sEditName.GetStr();
-											ImGui::SetWindowFocus(m_pSearchFile->m_sEditName.GetStr());
+										m_pSearchFile->m_bOpenForEdit = true;
+										cNextWindowFocus = (char *)m_pSearchFile->m_sEditName.GetStr();
+										ImGui::SetWindowFocus(m_pSearchFile->m_sEditName.GetStr());
 
-											//Save new project settings.
-											SaveProjectFile(firstProjects);
-										}
-
+										//Save new project settings.
+										SaveProjectFile(firstProjects, true);
 									}
-								}
 
+								}
+							}
 							}
 
 						}
@@ -4883,8 +4682,8 @@ int app::Loop (void)
 							firstProjects->m_bDisplayUnfolded = true;
 						}
 						if (ImGui::MenuItem("Collapse")) {
-							//Expand all
-							firstProjects->m_bDisplayCollapsed = true;
+							//Collapse all
+							firstProjects->m_bDisplayUnfolded = false;
 						}
 
 						ImGui::EndPopup();
@@ -4892,22 +4691,35 @@ int app::Loop (void)
 
 					if (TreeNodeOpen)
 					{
-						if (firstProjects->m_pMediaFolder) { //EXCEPTION m_pMediaFolder not set to ZERO ?. selected close project.
-							cFolderItem *oldnext = firstProjects->m_pMediaFolder->m_pNext;
-							uString oldname = firstProjects->m_pMediaFolder->m_sFolder;
-							//Only display this projects media.
-							firstProjects->m_pMediaFolder->m_pNext = NULL;
-							firstProjects->m_pMediaFolder->m_sFolder = "media";
-							firstProjects->m_pMediaFolder->visible = true;
-							GetTreePop(firstProjects->m_pMediaFolder);
-							firstProjects->m_pMediaFolder->visible = false;
-							firstProjects->m_pMediaFolder->m_sFolder = oldname;
-							firstProjects->m_pMediaFolder->m_pNext = oldnext;
-						}
+					if (firstProjects->m_pMediaFolder) { //EXCEPTION m_pMediaFolder not set to ZERO ?. selected close project.
+						cFolderItem *oldnext = firstProjects->m_pMediaFolder->m_pNext;
+						uString oldname = firstProjects->m_pMediaFolder->m_sFolder;
+						//Only display this projects media.
+						firstProjects->m_pMediaFolder->m_pNext = NULL;
+						firstProjects->m_pMediaFolder->m_sFolder = "media";
+						firstProjects->m_pMediaFolder->visible = true;
+						GetTreePop(firstProjects->m_pMediaFolder);
+						firstProjects->m_pMediaFolder->visible = false;
+						firstProjects->m_pMediaFolder->m_sFolder = oldname;
+						firstProjects->m_pMediaFolder->m_pNext = oldnext;
+					}
 
-						while (m_pCurrentFile) {
+					// Create a temporary sorted vector for alphabetical tree display
+					std::vector<cProjectItem::sProjectFiles*> sortedFiles;
+					m_pCurrentFile = firstProjects->m_pFirstFile;
+					while (m_pCurrentFile) {
+						sortedFiles.push_back(m_pCurrentFile);
+						m_pCurrentFile = m_pCurrentFile->m_pNext;
+					}
+					// Sort alphabetically by name
+					std::sort(sortedFiles.begin(), sortedFiles.end(), 
+						[](const cProjectItem::sProjectFiles* a, const cProjectItem::sProjectFiles* b) {
+							return _stricmp(a->m_sName.GetStr(), b->m_sName.GetStr()) < 0;
+						});
 
-							int leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+					// Display files in alphabetical order
+					for (size_t i = 0; i < sortedFiles.size(); i++) {
+						m_pCurrentFile = sortedFiles[i];							int leafFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_OpenOnDoubleClick;
 							if (m_pCurrentFile->m_editor->filechanged)
 								leafFlags |= ImGuiTreeNodeFlags_Bullet;
 							uString szNewName, szParse;
@@ -5001,7 +4813,7 @@ int app::Loop (void)
 												//Remove it.
 												removeFileFromProject(firstProjects, m_pCurrentFile);
 												//Save new project settings.
-												SaveProjectFile(firstProjects);
+												SaveProjectFile(firstProjects, true);
 												//Must update so.
 												ImGui::EndPopup();
 												ImGui::TreePop();
@@ -5018,9 +4830,6 @@ int app::Loop (void)
 								ImGui::TreePop();
 							}
 							if (ImGui::IsItemHovered()) ImGui::SetTooltip(szParse.GetStr());
-
-
-							m_pCurrentFile = m_pCurrentFile->m_pNext;
 						}
 
 						ImGui::TreePop();
@@ -5039,7 +4848,7 @@ int app::Loop (void)
 /*
 			ImGuiContext* ctx = GImGui;
 			ImGuiContext& g = *ctx;
-			ImGuiDockContext* dc = ctx->DockContext;
+			ImGuiDockContext* dc = &ctx->DockContext;
 			if (edit_area_parent) {
 				ImGuiID parent_id = edit_area_parent->DockId;
 				ImGuiDockNode* node = ImGui::DockContextFindNodeByID(ctx, parent_id);
@@ -5152,7 +4961,7 @@ int app::Loop (void)
 		//######################
 
 		if (remote_debug_is_running || debug_is_running || !pref.bAutoHideDebugWindows) {
-			if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(10, 10) + viewPortPos, ImGuiSetCond_Once); // undock window.
+			if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(10, 10) + viewPortPos, ImGuiCond_Once); // undock window.
 			if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(340, 300));
 			//if (bUseDockFamily)
 			//	ImGui::SetNextWindowDockFamily(&editorfamily);
@@ -5169,7 +4978,7 @@ int app::Loop (void)
 		//#### Assets browser , display all folders from projects and DLC. ####
 		//#####################################################################
 
-		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(400, 400)+ viewPortPos, ImGuiSetCond_Once);
+		if (refresh_gui_docking == 0) ImGui::SetNextWindowPos(ImVec2(400, 400)+ viewPortPos, ImGuiCond_Once);
 		if (refresh_gui_docking == 0) ImGui::SetNextWindowSize(ImVec2(300, 200));
 		//if (bUseDockFamily)
 		//	ImGui::SetNextWindowDockFamily(&editorfamily);
@@ -5195,7 +5004,11 @@ int app::Loop (void)
 				}
 				ImGui::EndPopup();
 			}
+			// After moving the cursor back to its original position, submit a zero-size item
+			// to satisfy ImGui's requirement that SetCursorPos/SetCursorScreenPos be followed by an item
+			// when they could affect parent boundaries (prevents warning/assert with large fonts).
 			ImGui::SetCursorPos(oldCursor);
+			ImGui::Dummy(ImVec2(0.0f, 0.0f));
 
 
 			ImGui::End();
@@ -5235,6 +5048,13 @@ int app::Loop (void)
 					if (sorted_project_files.size() >= 1) {
 						cProjectItem::sProjectFiles  *m_pSearchFile, *m_pSortedFile, *m_ptmpFile;
 
+						// Initialize m_pSortedNext for all files before sorting
+						m_pSearchFile = firstProjects->m_pFirstFile;
+						while (m_pSearchFile) {
+							m_pSearchFile->m_pSortedNext = m_pSearchFile->m_pNext;
+							m_pSearchFile = m_pSearchFile->m_pNext;
+						}
+
 						m_pSortedFile = NULL;
 						m_ptmpFile = firstProjects->m_pFirstFile;
 						std::sort(sorted_project_files.begin(), sorted_project_files.end(), NoCaseLess);
@@ -5258,12 +5078,18 @@ int app::Loop (void)
 											m_pSortedFile = m_pSearchFile;
 											m_pSortedFile->m_pNext = NULL;
 										}
+										break; // Found the file, exit inner loop
 									}
 								}
 
 								m_pSearchFile = m_pSearchFile->m_pSortedNext;
 							}
 
+						}
+
+						// Properly terminate the linked list
+						if (m_pSortedFile) {
+							m_pSortedFile->m_pNext = NULL;
 						}
 
 						//Reorder m_pSortedNext so it can be used again.
@@ -5443,7 +5269,10 @@ int app::Loop (void)
 					//	ImGui::SetNextWindowDockFamily(&editorfamily);
 					//if(bDisplayAsText)
 
-					if (vTextEditor((char *)m_pCurrentFile->m_sEditName.GetStr(), m_pCurrentFile->m_editor, (char*)m_pCurrentFile->m_sName.GetStr(), (char*)m_pCurrentFile->m_sFullPath.GetStr(), m_pCurrentFile->m_bUseSaveAs, m_pCurrentFile))
+					{
+						bool bEditorClosed = vTextEditor((char *)m_pCurrentFile->m_sEditName.GetStr(), m_pCurrentFile->m_editor, (char*)m_pCurrentFile->m_sName.GetStr(), (char*)m_pCurrentFile->m_sFullPath.GetStr(), m_pCurrentFile->m_bUseSaveAs, m_pCurrentFile);
+
+						if (bEditorClosed)
 					{
 						//Quit this editor.
 
@@ -5498,6 +5327,8 @@ int app::Loop (void)
 						}
 						gotDialog = true;
 					}
+				}
+				// Close if (bThisEditorActive)
 				}
 				if(m_pCurrentFile)
 					m_pCurrentFile = m_pCurrentFile->m_pNext;
@@ -5699,6 +5530,15 @@ int app::Loop (void)
 
 		if (delaydialog > 0) delaydialog--;
 
+		if (bQueuedProjectClose && pQueuedProjectClose)
+		{
+			SaveProjectFile(pQueuedProjectClose);
+			RemoveProject(pQueuedProjectClose);
+			setVisibleProjectsInAssetBrowser();
+			bQueuedProjectClose = false;
+			pQueuedProjectClose = NULL;
+		}
+
 		if (gotDialog) {
 
 			if (pRepeatRemoveProject != NULL) {
@@ -5716,18 +5556,26 @@ int app::Loop (void)
 			}
 		}
 
-		if (cNextWindowFocus != NULL && refresh_gui_docking == 4 ) {
-			if (cNextWindowFocusCount == 3) { //Wait 3 frames so we are sure its open/created.
+		// If we have a desired active editor but no explicit window target set, derive it now
+		if (cNextWindowFocus == NULL && bFocusActiveEditor && m_ActiveEditor && refresh_gui_docking == 4) {
+			cProjectItem::sProjectFiles * pf = FindFileFromEditor(m_ActiveEditor);
+			if (pf) {
+				cNextWindowFocus = (char *)pf->m_sEditName.GetStr();
+				cNextWindowFocusCount = 0; // restart the focus attempt window
+			}
+		}
 
+		if (cNextWindowFocus != NULL && refresh_gui_docking == 4 ) {
+			// Try to focus not just once but across several frames to account for windows created slightly later.
+			if (cNextWindowFocusCount >= 3 && cNextWindowFocusCount < 12) {
 				ImGui::SetWindowFocus(cNextWindowFocus);
 				if(!bFocusActiveEditor) {
 					cNextWindowFocusCount = 0;
 					cNextWindowFocus = NULL;
 				}
-
 			}
-			else if (cNextWindowFocusCount >= 8) {
-				//We need some frames before we can activate cursor.
+			else if (cNextWindowFocusCount >= 12) {
+				// After several attempts, ensure cursor scroll and clear focus request.
 				if (bFocusActiveEditor && m_ActiveEditor) {
 					m_ActiveEditor->mScrollToCursor = true;
 				}
@@ -5736,8 +5584,8 @@ int app::Loop (void)
 				bFocusActiveEditor = false;
 			}
 			cNextWindowFocusCount++;
-			if (cNextWindowFocusCount > 10)
-				cNextWindowFocusCount = 10;
+			if (cNextWindowFocusCount > 14)
+				cNextWindowFocusCount = 14;
 		}
 
 		if(delaydialog == 0 && iWordCount > 0)
@@ -5789,7 +5637,7 @@ int app::Loop (void)
 		if (bAgkFullscreenTrigger && agk::Timer() - agkFullscreenTimer < 4.0) {
 
 			ImVec2 wpos = ImVec2((agk::GetDeviceWidth() - 460) * 0.5, 50) + ImGui::GetMainViewport()->Pos;
-			ImGui::SetNextWindowPos(wpos, ImGuiSetCond_Once);
+			ImGui::SetNextWindowPos(wpos, ImGuiCond_Once);
 			bool winopen = true;
 
 			ImVec4* style_colors = ImGui::GetStyle().Colors;
@@ -6810,7 +6658,7 @@ bool ProcessPreviewFile(cFolderItem::sFolderFiles * selectedfile)
 					float fCenterX = (fPreviewWidth - iImgW*fRatio) * 0.5;
 					float fCenterY = (fPreviewHeight - iImgH*fRatio) * 0.5;
 					ImGui::SetCursorPos(ImVec2(fCenterX + 2, fCenterY + TitleSize + iTextHeight + 1)); //TitleSize
-					ImGui::ImageButton((void*)myTextureID, ImVec2(iImgW*fRatio, iImgH*fRatio), ImVec2(0, 0), ImVec2(1, 1), -5, pref.icon_background_color, ImVec4(1, 1, 1, 1));
+					ImGui::ImageButton("##preview_image", ImTextureRef((ImTextureID)(intptr_t)myTextureID), ImVec2(iImgW*fRatio, iImgH*fRatio), ImVec2(0, 0), ImVec2(1, 1), pref.icon_background_color, ImVec4(1, 1, 1, 1));
 				}
 				copymediabut = true;
 				bUnknown = false;
@@ -6818,7 +6666,7 @@ bool ProcessPreviewFile(cFolderItem::sFolderFiles * selectedfile)
 
 			if (ext.CompareTo(".ttf") == 0) {
 				if (bPreviewFontLoaded) {
-					if (previewFont && previewFont->FontSize > 0.0f ) {
+					if (previewFont && previewFont->LegacySize > 0.0f ) {
 						if (!previewFont->IsLoaded())
 							ImGui::PushFont(defaultfont);  //defaultfont
 						else
@@ -6953,6 +6801,10 @@ bool ProcessPreviewFile(cFolderItem::sFolderFiles * selectedfile)
 					mem_view_edit.OptShowOptions = false;
 					mem_view_edit.Open = true;
 					mem_view_edit.DrawContents(&cMemBuffer[0], selectedfile->iBigPreview, 0x0000);
+					
+					// Add dummy item to extend window boundaries as required by ImGui 1.92+
+					ImGui::Dummy(ImVec2(0.0f, 0.0f));
+					
 					mem_view_edit.Open = false;
 				}
 				ImGui::PopFont();
@@ -7390,7 +7242,7 @@ cFolderItem * ProcessFolderFiles(cFolderItem * m_pSelectedFolder,const char * cp
 						cImage *pImage = agk::GetImagePtr(folder_icon);
 						if (pImage)
 							myTextureID = pImage->GetTextureID() + 100000; // 200000 // 100000+ = No Color Array , 200000+ = No transparent
-						if (ImGui::ImageButton((void*)myTextureID, ImVec2(pref.media_icon_size, pref.media_icon_size), ImVec2(0, 0), ImVec2(1, 1), -5, pref.icon_background_color, ImVec4(1, 1, 1, 1)))
+						if (ImGui::ImageButton("##folder_icon", ImTextureRef((ImTextureID)(intptr_t)myTextureID), ImVec2(pref.media_icon_size, pref.media_icon_size), ImVec2(0, 0), ImVec2(1, 1), pref.icon_background_color, ImVec4(1, 1, 1, 1)))
 						{
 							//m_pSelectedFile = m_pFiles;
 						}
@@ -7506,7 +7358,7 @@ cFolderItem * ProcessFolderFiles(cFolderItem * m_pSelectedFolder,const char * cp
 						ext.Lower();
 						if (ext.CompareTo(".ps") == 0 || ext.CompareTo(".vs") == 0 || ext.CompareTo(".agc") == 0 || ext.CompareTo(".agk") == 0 || ext.CompareTo(".lua") == 0 || ext.CompareTo(".fx") == 0 ) {
 
-							if (ImGui::ImageButton((void*)myTextureID, ImVec2(pref.media_icon_size, pref.media_icon_size), ImVec2(0, 0), ImVec2(1, 1), -5, pref.icon_background_color, ImVec4(1, 1, 1, 1)))
+							if (ImGui::ImageButton("##file_icon", ImTextureRef((ImTextureID)(intptr_t)myTextureID), ImVec2(pref.media_icon_size, pref.media_icon_size), ImVec2(0, 0), ImVec2(1, 1), pref.icon_background_color, ImVec4(1, 1, 1, 1)))
 							{
 								//No need to preview.
 								m_pSelectedFile = m_pFiles;
@@ -9142,7 +8994,7 @@ bool vTextEditor(char *winname, TextEditor * m_editor, char * cName, char * cPat
 			ImGui::OpenPopup("File changed.");
 
 			ImGui::SetNextWindowSize(ImVec2(38 * ImGui::GetFontSize(), 10 * ImGui::GetFontSize()), ImGuiCond_Once);
-			ImGui::SetNextWindowPosCenter(ImGuiCond_Once);
+			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
 
 			if (ImGui::BeginPopupModal("File changed.", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 			{
@@ -9253,7 +9105,7 @@ bool vTextEditor(char *winname, TextEditor * m_editor, char * cName, char * cPat
 		ImGui::SetNextWindowPos(ImVec2(40, 40));
 		ImGui::SetNextWindowSize(ImVec2(600, 400));
 	}
-	if (m_editor->firstrun) ImGui::SetNextWindowPos(ImVec2(1140, 1140) , ImGuiSetCond_Once);
+	if (m_editor->firstrun) ImGui::SetNextWindowPos(ImVec2(1140, 1140) , ImGuiCond_Once);
 
 	//ImGuiWindowFlags_NoScrollbar
 	if (m_pCurFile && m_pCurFile->m_scene && !m_pCurFile->m_scene->bDisplayAsText) {
@@ -9729,7 +9581,7 @@ bool vTextEditor(char *winname, TextEditor * m_editor, char * cName, char * cPat
 
 				ImGui::Separator();
 
-				if (ImGui::MenuItem("Select all", nullptr, nullptr))
+				if (ImGui::MenuItem("Select All", nullptr, nullptr))
 					m_editor->SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(m_editor->GetTotalLines(), 0));
 
 				ImGui::Separator();
@@ -10478,7 +10330,7 @@ void sort_project_files_order(cProjectItem * searchProject)
 
 		ImGuiContext* ctx = GImGui;
 		ImGuiContext& g = *ctx;
-		ImGuiDockContext* dc = ctx->DockContext;
+		ImGuiDockContext* dc = &ctx->DockContext;
 		if (edit_area_parent) {
 			ImGuiID parent_id = edit_area_parent->DockId;
 
@@ -10499,6 +10351,15 @@ void sort_project_files_order(cProjectItem * searchProject)
 
 		cProjectItem::sProjectFiles *m_pSearchFile, *m_pSortedFile, *m_ptmpFile;
 
+		// Ensure m_pSortedNext is initialized for all files so traversal
+		// used by the tab-order sort sees newly-added nodes that may
+		// have m_pSortedNext == NULL.
+		m_pSearchFile = searchProject->m_pFirstFile;
+		while (m_pSearchFile) {
+			m_pSearchFile->m_pSortedNext = m_pSearchFile->m_pNext;
+			m_pSearchFile = m_pSearchFile->m_pNext;
+		}
+
 		//Sort files inside project.
 		if (sorted_project_files.size() >= 1) {
 
@@ -10511,16 +10372,8 @@ void sort_project_files_order(cProjectItem * searchProject)
 				while (m_pSearchFile) {
 					if (it->size() > 0) {
 
-						uString newTabname = m_pSearchFile->m_sEditName;
-						uString newEditName = m_pSearchFile->m_sEditName;
-						int ntb_pos = newTabname.RevFindStr("/");
-						if (ntb_pos <= 0)
-							ntb_pos = newTabname.RevFindStr("\\");
-						if (ntb_pos > 0) {
-							newTabname.SubString(newEditName, ntb_pos + 1);
-						}
-
-						if (strcmp(it->c_str(), newEditName.GetStr()) == 0) {
+						// Compare directly with m_sEditName since tab->Window->Name contains the full name with ##projectname suffix
+						if (strcmp(it->c_str(), m_pSearchFile->m_sEditName.GetStr()) == 0) {
 							if (m_pSortedFile == NULL) {
 								//first entry.
 								searchProject->m_pFirstFile = m_pSearchFile;
@@ -10532,6 +10385,7 @@ void sort_project_files_order(cProjectItem * searchProject)
 								m_pSortedFile = m_pSearchFile;
 								m_pSortedFile->m_pNext = NULL;
 							}
+							break; // Found the file, exit inner loop
 						}
 					}
 
@@ -10540,6 +10394,35 @@ void sort_project_files_order(cProjectItem * searchProject)
 
 			}
 
+
+			// Append any files not in the tab-ordered list (e.g., newly added files not yet in ImGui tab bar)
+			m_pSearchFile = m_ptmpFile;
+			while (m_pSearchFile) {
+				bool found = false;
+				for (std::vector<std::string>::iterator it = sorted_project_files.begin(); it != sorted_project_files.end(); ++it) {
+					// Compare directly with m_sEditName since tab->Window->Name contains the full name with ##projectname suffix
+					if (strcmp(it->c_str(), m_pSearchFile->m_sEditName.GetStr()) == 0) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					if (m_pSortedFile == NULL) {
+						searchProject->m_pFirstFile = m_pSearchFile;
+						m_pSortedFile = m_pSearchFile;
+					}
+					else {
+						m_pSortedFile->m_pNext = m_pSearchFile;
+						m_pSortedFile = m_pSearchFile;
+					}
+				}
+				m_pSearchFile = m_pSearchFile->m_pSortedNext;
+			}
+
+			// Properly terminate the linked list
+			if (m_pSortedFile) {
+				m_pSortedFile->m_pNext = NULL;
+			}
 
 			//Reorder m_pSortedNext so it can be used again.
 			m_ptmpFile = searchProject->m_pFirstFile;
@@ -10553,4 +10436,78 @@ void sort_project_files_order(cProjectItem * searchProject)
 		}
 		sorted_project_files.clear();
 	}
+}
+
+void sort_project_files_alphabetically(cProjectItem * searchProject)
+{
+	if (!searchProject || !searchProject->m_pFirstFile) return;
+
+	std::vector<std::string> sorted_project_files;
+	cProjectItem::sProjectFiles *m_pSearchFile, *m_pSortedFile, *m_ptmpFile;
+
+	// Initialize m_pSortedNext for all files
+	m_pSearchFile = searchProject->m_pFirstFile;
+	while (m_pSearchFile) {
+		m_pSearchFile->m_pSortedNext = m_pSearchFile->m_pNext;
+		m_pSearchFile = m_pSearchFile->m_pNext;
+	}
+
+	// Collect all file names
+	m_pSearchFile = searchProject->m_pFirstFile;
+	while (m_pSearchFile) {
+		uString newEditName = m_pSearchFile->m_sEditName;
+		sorted_project_files.push_back(newEditName.GetStr());
+		m_pSearchFile = m_pSearchFile->m_pNext;
+	}
+
+	// Sort files alphabetically
+	if (sorted_project_files.size() >= 1) {
+
+		m_pSortedFile = NULL;
+		m_ptmpFile = searchProject->m_pFirstFile;
+		std::sort(sorted_project_files.begin(), sorted_project_files.end(), NoCaseLess);
+
+		for (std::vector<std::string>::iterator it = sorted_project_files.begin(); it != sorted_project_files.end(); ++it) {
+
+			m_pSearchFile = m_ptmpFile;
+			while (m_pSearchFile) {
+				if (it->size() > 0) {
+
+					uString newEditName = m_pSearchFile->m_sEditName;
+					if (strcmp(it->c_str(), newEditName.GetStr()) == 0) {
+						if (m_pSortedFile == NULL) {
+							//first entry.
+							searchProject->m_pFirstFile = m_pSearchFile;
+							m_pSortedFile = m_pSearchFile;
+							m_pSortedFile->m_pNext = NULL;
+						}
+						else {
+							m_pSortedFile->m_pNext = m_pSearchFile;
+							m_pSortedFile = m_pSearchFile;
+							m_pSortedFile->m_pNext = NULL;
+						}
+						break; // Found the file, exit inner loop
+					}
+				}
+
+				m_pSearchFile = m_pSearchFile->m_pSortedNext;
+			}
+
+		}
+
+		// Properly terminate the linked list
+		if (m_pSortedFile) {
+			m_pSortedFile->m_pNext = NULL;
+		}
+
+		//Reorder m_pSortedNext so it can be used again.
+		m_ptmpFile = searchProject->m_pFirstFile;
+		m_pSearchFile = m_ptmpFile;
+		while (m_pSearchFile) {
+			m_pSearchFile->m_pSortedNext = m_pSearchFile->m_pNext;
+			m_pSearchFile = m_pSearchFile->m_pNext;
+		}
+
+	}
+	sorted_project_files.clear();
 }

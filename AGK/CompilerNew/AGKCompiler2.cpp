@@ -101,10 +101,43 @@ int AGK_Compiler::RunCompiler( const char* lpCmdLine )
 
 	bool bCompile = true;
 	bool bRun = false; // this shouldn't be done by the compiler in future
-	bool b64Bit = false;
+	bool b64Bit = true;
+	bool bBroadcast = false; // this shouldn't be done by the compiler in future
 	bool bShowStats = false;
 	uString sProjectPath;
+	
+#ifdef GEANY_IDE
+	
+	uString sCmdLine(lpCmdLine);
+	sCmdLine.Trim("\" ");
+	if (sCmdLine.ByteAt(0) == '-')
+	{
+		if (strncmp(sCmdLine.GetStr(), "-run ", 5) == 0)
+		{
+			bCompile = true;
+			bRun = true;
+			bBroadcast = true;
+		}
+		else if (strncmp(sCmdLine.GetStr(), "-agk ", 5) == 0)
+		{
+			bCompile = true;
+		}
+		else if (strncmp(sCmdLine.GetStr(), "-bct ", 5) == 0)
+		{
+			bCompile = true;
+			bBroadcast = true;
+		}
+	}
 
+	if (sCmdLine.FindStr(" -64 ") >= 0) b64Bit = true;
+
+	//fTokenTime = 0;
+	//iLineCountTotal = 0;
+
+	cFile::Init(sProjectPath);
+
+#else
+	
 	const char* ptr = lpCmdLine;
 	while( *ptr )
 	{
@@ -154,7 +187,10 @@ int AGK_Compiler::RunCompiler( const char* lpCmdLine )
 		}
 	}
 
-	cFile::Init( sProjectPath );
+	cFile::Init(sProjectPath);
+
+#endif
+	
     
     //printf( "%s\n", cFile::GetWritePath() );
 
@@ -334,9 +370,15 @@ int AGK_Compiler::RunCompiler( const char* lpCmdLine )
 
 #ifndef AGK_STATIC_LIB
 	#ifdef _WINDOWS
+#ifdef GEANY_IDE
+		const char* WindowsEXE = "../../media/interpreters/Windows.exe";
+		if (b64Bit) WindowsEXE = "../../media/interpreters/Windows64.exe";
+		if (!cFile::CopyFile(WindowsEXE, sProjectName))
+#else
 		const char* WindowsEXE = "../interpreters/Windows.exe";
 		if ( b64Bit ) WindowsEXE = "../interpreters/Windows64.exe";
 		if ( !cFile::CopyFile( WindowsEXE, sProjectName ) )
+#endif
 	#elif IDE_MAC
         if ( !cFile::CopyFile( "../interpreters/Mac.app", sProjectName ) )
 	#elif IDE_LINUX

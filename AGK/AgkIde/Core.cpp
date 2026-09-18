@@ -39,6 +39,8 @@ bool bExitLoop = false;
 bool bAGKInitialized = false;
 bool bAGKInMainLoop = false;
 
+extern int WindowPosX, WindowPosY;
+
 bool os_messages_support = true;
 unsigned int os_messages = 0;
 unsigned int os_messages_old = 0;
@@ -962,7 +964,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 			MUTEX_ALL_ACCESS, 0, L"AppGameKitStudioUniqueId20427509String");
 
 		if (!hMutex)
-			// Mutex doesn’t exist. This is
+			// Mutex doesnï¿½t exist. This is
 			// the first instance so create
 			// the mutex.
 			hMutex =
@@ -1052,7 +1054,7 @@ So GLES 3.1: gl_maj_version=3+ , gl_min_version=1
 
 		App.Begin(agk_hWnd);
 
-		if (screenWidth > 150 && screenHeight > 150 && screenWidth < 9999 && screenHeight < 9999) {
+		if (screenWidth > 150 && screenHeight > 150 && screenWidth < 9999 && screenHeight < 9999 && WindowPosX == 0 && WindowPosY == 0) {
 			dwCenterWindowX = (GetSystemMetrics(SM_CXSCREEN) - (int)screenWidth) / 2;
 			dwCenterWindowY = (GetSystemMetrics(SM_CYSCREEN) - (int)screenHeight) / 2;
 			::SetWindowPos(g_hWnd, 0, dwCenterWindowX, dwCenterWindowY, screenWidth, screenHeight , SWP_NOZORDER);

@@ -7,7 +7,13 @@ INC = `pkg-config --cflags gtk+-3.0` -Icommon/include -Icommon -Ibullet -Ibullet
 CFLAGS = -O2 -DNDEBUG 
 LDFLAGS32 = -Lplatform/linux/Lib/Release32
 LDFLAGS64 = -Lplatform/linux/Lib/Release64
-LDFLAGS = $(LDFLAGS$(ARCH)) -static-libstdc++ -static-libgcc -L../Broadcaster/AGKBroadcaster/build -L../CompilerNew/build --std=c++11 -no-pie
+
+# Select correct LDFLAGS based on detected ARCH (avoid recursive variable expansion)
+ifeq ($(ARCH),64)
+LDFLAGS = $(LDFLAGS64) -static-libstdc++ -static-libgcc -L../Broadcaster/AGKBroadcaster/build -L../CompilerNew/build --std=c++11 -no-pie
+else
+LDFLAGS = $(LDFLAGS32) -static-libstdc++ -static-libgcc -L../Broadcaster/AGKBroadcaster/build -L../CompilerNew/build --std=c++11 -no-pie
+endif
 
 # list of dependencies so that changes to these files cause a rebuild of source files
 DEPS = template.h
@@ -17,7 +23,8 @@ DEPS = template.h
 _OBJS = CoreLinux.o \
         2DScene.o \
         files.o \
-        Gui.o \
+	    imgui_scrollbar_arrows.o \
+	    Gui.o \
         Ide.o \
         Project.o  
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
@@ -31,6 +38,9 @@ setup:
 
 # compile a source file, first search path is the template folder
 $(ODIR)/%.o: %.cpp $(DEPS)
+	$(CC) -DIDE_LINUX -DAGK_LINUX -D__x86_$(ARCH)_ -Wno-unused-result -static -no-pie -c -std=c++11 $(INC) -o $@ $< $(CFLAGS)
+
+$(ODIR)/imgui_scrollbar_arrows.o: imgui/imgui_scrollbar_arrows.cpp $(DEPS)
 	$(CC) -DIDE_LINUX -DAGK_LINUX -D__x86_$(ARCH)_ -Wno-unused-result -static -no-pie -c -std=c++11 $(INC) -o $@ $< $(CFLAGS)
 
 # link the .o files

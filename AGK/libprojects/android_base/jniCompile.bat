@@ -1,6 +1,11 @@
 @echo off
 
-set NDKBUILDCMD="%NDK_PATH%\ndk-build"
+rem Prefer explicit NDK_PATH if provided, else fall back to ndk-build on PATH (point this to r28c)
+if "%NDK_PATH%"=="" (
+	set NDKBUILDCMD=ndk-build
+) else (
+	set NDKBUILDCMD="%NDK_PATH%\ndk-build"
+)
 
 cd ..\android_bullet
 call %NDKBUILDCMD% -j16 2> log.txt

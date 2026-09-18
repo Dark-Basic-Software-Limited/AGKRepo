@@ -776,6 +776,37 @@ char * read_eula( void )
 	return(NULL);
 }
 
+char * read_buildinfo( void )
+{
+#ifdef AGK_WINDOWS
+	_chdir(startupFolder);
+#else
+	chdir(startupFolder);
+#endif
+	size_t size = 1;
+	char *spTmp;
+	FILE* buildinfofile = fopen("media/buildinfo.txt", "rb");
+	if (!buildinfofile)
+		buildinfofile = AGKfopen("media/buildinfo.txt", "rb");
+
+	if (buildinfofile) {
+		fseek(buildinfofile, 0L, SEEK_END);
+		size = ftell(buildinfofile);
+		fseek(buildinfofile, 0L, SEEK_SET);
+		spTmp = (char *)malloc(size+1);
+		size = fread(spTmp, 1, size, buildinfofile);
+		fclose(buildinfofile);
+		for (int i = 0; i < size; i++) {
+			if (spTmp[i] <= 3 || spTmp[i] >= 128)
+				spTmp[i] = ' ';
+		}
+		spTmp[size] = 0;
+
+		return(spTmp);
+	}
+	return(NULL);
+}
+
 
 //########################
 //#### Do file exists ####
@@ -1532,13 +1563,17 @@ uString GetGameGuruFolder()
 #endif
 
 static int button_count;
-char cDropCode[4096];
+static const int button_clipboard_text_size = 8192;
+static const int max_button_count = 30;
+
+char cDropCode[button_clipboard_text_size];
+static char button_clipboard_text[max_button_count][button_clipboard_text_size]; // Store clipboard text for up to 30 buttons
 
 void renderTheText(uString renderText, bool entercodemode, bool bSeperator)
 {
 	char ctmp[MAX_PATH];
 	if (entercodemode) {
-		uString ipText = renderText;
+	uString ipText = renderText;
 		ImVec2 cursoroldend;
 		char *change;
 
@@ -1547,19 +1582,88 @@ void renderTheText(uString renderText, bool entercodemode, bool bSeperator)
 			renderText.SubString(ipText, 1);
 		}
 
-		change = (char*)ipText.GetStr();
-		if (change[ipText.GetLength() - 1] == '\n')
-			change[ipText.GetLength() - 1] = 0;
+		ipText.ReplaceStr("&quot;", "\"");
+		ipText.ReplaceStr("&lt;", "<");
+		ipText.ReplaceStr("&gt;", ">");
+		ipText.ReplaceStr("&amp;", "&");
+		ipText.ReplaceStr("&#039;", "\'");
 
+
+		// Store the text for clipboard use, removing trailing whitespace
+		if (button_count < max_button_count) {
+			const char* srcText = ipText.GetStr();
+			int srcLen = ipText.GetLength();
+
+			// Remove trailing newlines and carriage returns
+			while (srcLen > 0 && (srcText[srcLen - 1] == '\n' || srcText[srcLen - 1] == '\r')) {
+				srcLen--;
+			}
+
+			// Store the cleaned text for this button
+			int copyLen = (srcLen < (button_clipboard_text_size - 1)) ? srcLen : (button_clipboard_text_size - 1);
+			strncpy(button_clipboard_text[button_count], srcText, copyLen);
+			button_clipboard_text[button_count][copyLen] = '\0';
+		}
+
+		int current_button_id = button_count;
 		sprintf(ctmp, "##ecode%d", button_count++);
 		int ti_flags = ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_ReadOnly;
 		ImGui::PushItemWidth(-36);
-		float count = ipText.Count('\n');
-		if( count >= 1) {
-			count++;
-			count *= (ImGui::CalcTextSize("#").y+1.5);
+		// Build a trimmed display version without trailing whitespace so box height fits exact content
+		uString displayText;
+		{
+			const char* s = ipText.GetStr();
+			int start = 0;
+			int end = ipText.GetLength();
+			// Trim leading whitespace/newlines
+			while (start < end && (s[start] == '\n' || s[start] == '\r' || s[start] == ' ' || s[start] == '\t')) start++;
+			// Trim trailing whitespace/newlines
+			while (end > start && (s[end - 1] == '\n' || s[end - 1] == '\r' || s[end - 1] == ' ' || s[end - 1] == '\t')) end--;
+			if (end > start) ipText.SubString(displayText, start, end - start);
+			else displayText = "";
+		}
+		// Compute a more accurate height for multiline code blocks to avoid unnecessary scrollbars
+		int lines = 1;
+		{
+			const char* s = displayText.GetStr();
+			if (s) {
+				lines = 1;
+				for (size_t i = 0, n = displayText.GetLength(); i < n; ++i) {
+					if (s[i] == '\n') lines++;
+				}
+			}
+		}
+	float line_h = ImGui::GetTextLineHeight();
+	float height = lines * line_h + ImGui::GetStyle().FramePadding.y * 2.0f + 1.0f; // epsilon to avoid vertical scrollbar
+		if( lines >= 1) {
+			// Compute maximum line width in pixels for horizontal scrolling support
+			float max_line_px = 0.0f;
+			{
+				const char* s = displayText.GetStr();
+				int n = displayText.GetLength();
+				const char* line_start = s;
+				for (int i = 0; i <= n; ++i) {
+					if (i == n || s[i] == '\n') {
+						const char* line_end = s + i;
+						ImVec2 sz = ImGui::CalcTextSize(line_start, line_end);
+						if (sz.x > max_line_px) max_line_px = sz.x;
+						line_start = s + i + 1;
+					}
+				}
+			}
 
-			ImGui::InputTextMultiline(ctmp, (char *)ipText.GetStr(), ipText.GetLength() , ImVec2(-36, count), ti_flags);
+			// Place the code box inside a child with horizontal scrollbar
+			char cchild[64];
+			sprintf(cchild, "##ecode_child%d", current_button_id);
+			float scroll_h = ImGui::GetStyle().ScrollbarSize;
+			float child_h = height + scroll_h + 0.5f; // slight nudge up without causing vertical scrollbar
+			ImGui::BeginChild(cchild, ImVec2(-36, child_h), false, ImGuiWindowFlags_HorizontalScrollbar);
+			float box_min_w = ImGui::GetContentRegionAvail().x; // at least fill visible width
+			float box_target_w = max_line_px + ImGui::GetStyle().FramePadding.x * 2.0f + 2.0f; // extend if needed
+			float box_w = (box_target_w > box_min_w ? box_target_w : box_min_w);
+			// Keep the full text height; only the child reserves space for the scrollbar
+			ImGui::InputTextMultiline(ctmp, (char *)displayText.GetStr(), displayText.GetLength() + 1, ImVec2(box_w, height), ti_flags);
+			ImGui::EndChild();
 			cursoroldend = ImGui::GetCursorPos();
 			ImGui::SameLine();
 
@@ -1574,16 +1678,17 @@ void renderTheText(uString renderText, bool entercodemode, bool bSeperator)
 			ImGui::SameLine();
 		}
 
-		ImGui::PushID(button_count);
+		ImGui::PushID(current_button_id);
 		if (ImGui::Button(ICON_MD_CONTENT_COPY)) {
-			if (change && strlen(change) < 4096) {
-				ImGui::SetClipboardText(change);
+			if (current_button_id < max_button_count && strlen(button_clipboard_text[current_button_id]) > 0) {
+				ImGui::SetClipboardText(button_clipboard_text[current_button_id]);
 			}
 		}
 		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
 		{
-			if (change && strlen(change) < 4096) {
-				strcpy(cDropCode, change);
+			if (current_button_id < max_button_count && strlen(button_clipboard_text[current_button_id]) > 0) {
+				strncpy(cDropCode, button_clipboard_text[current_button_id], sizeof(cDropCode) - 1);
+				cDropCode[sizeof(cDropCode) - 1] = '\0';
 				char *ptr = &cDropCode[0];
 				ImGui::SetDragDropPayload("DND_TEXT_DROP_TARGET", &ptr, sizeof(char*));
 				ImGui::Text("Drop Code");
@@ -1592,12 +1697,21 @@ void renderTheText(uString renderText, bool entercodemode, bool bSeperator)
 			ImGui::EndDragDropSource();
 		}
 		ImGui::PopID();
-		ImGui::SetCursorPos(cursoroldend);
+	ImGui::SetCursorPos(cursoroldend);
+		// ImGui 1.89+ note: SetCursorPos/SetCursorScreenPos no longer extend parent boundaries.
+		// Submit a zero-size item to nudge layout so window/parent bounds account for this cursor position.
+		// See: 2022/09/02 (1.89) changelog. This keeps the help window sizing consistent with older behavior.
+	ImGui::Dummy(ImVec2(0, 0));
+	// Ensure exactly one blank line after the last line of the example
+	ImGui::Dummy(ImVec2(0, ImGui::GetTextLineHeightWithSpacing()));
 
 		if (ImGui::BeginPopupContextItemAGK(ctmp)) //"project context menu"
 		{
 			if (ImGui::MenuItem("Copy to clipboard")) {
-				ImGui::SetClipboardText(ipText.GetStr());
+				if (current_button_id < max_button_count && strlen(button_clipboard_text[current_button_id]) > 0)
+					ImGui::SetClipboardText(button_clipboard_text[current_button_id]);
+				else if (ipText.GetLength() < 4096)
+					ImGui::SetClipboardText(ipText.GetStr());
 			}
 			ImGui::EndPopup();
 		}
@@ -1638,7 +1752,7 @@ void renderTheText(uString renderText, bool entercodemode, bool bSeperator)
 	return;
 }
 
-#define MAXHELPFILESIZE 141696 //orginal value 32768 (512 commands * 64, new value 141696 (2214 commands * 64)
+#define MAXHELPFILESIZE 142869 
 static char cHelpPagePath[MAX_PATH];
 static char cHelpFolder[MAX_PATH];
 static char cHelpPage[MAXHELPFILESIZE + 2];
@@ -1867,6 +1981,90 @@ void processhelp(const char * page,bool readnewpage)
 
 		parsedPage = cHelpPage;
 
+		uString usCommand = cHelpPagePath;
+		if (usCommand.FindStr("Help/Reference/") > 0 && usCommand.Count('/') == 4)
+		{
+			uString tmp = "";
+			int nLastSep = usCommand.RevFind('/');
+			if (nLastSep > 0)
+			{
+				usCommand.SubString(tmp, nLastSep + 1);
+			}
+
+			if (tmp.GetLength() > 0 && tmp.RevFindStr(".htm") > 0)
+			{
+				usCommand = tmp;
+			}
+			else
+			{
+				usCommand = "";
+			}
+		}
+		else
+		{
+			usCommand = "";
+		}
+
+		if (usCommand.GetLength() > 0)
+		/*if (sKeyNext != NULL && sKeyNext->m_cCommand != "\0" && usFullHelpPath.GetLength() > sKeyNext->m_cCommandPath.GetLength() && usFullHelpPath.FindStr(sKeyNext->m_cCommandPath) > 0)*/
+		{
+			uString usCommandExample = cHelpFolder;
+			usCommandExample.Append("media/Help/command_examples/tier1/");
+			usCommandExample.Append(usCommand/*sKeyNext->m_cCommand*/);
+			//usCommandExample.Append(".htm");
+
+			FILE* sourceCommandExample = fopen(usCommandExample.GetStr(), "rb");
+			if (!sourceCommandExample)
+				sourceCommandExample = AGKfopen(usCommandExample.GetStr(), "rb");
+
+			strcpy(cHelpPage, "");
+			//strcpy(cHelpPage2, "");
+			if (sourceCommandExample) {
+				int size = fread(cHelpPage, 1, MAXHELPFILESIZE, sourceCommandExample);
+
+				cHelpPage[size] = 0;
+				fclose(sourceCommandExample);
+			}
+			else {
+				sprintf(cHelpPage, "Cant read %s.", usCommandExample.GetStr());
+			}
+
+			usCommandExample = "";
+
+			uString usExampleHtml = cHelpPage;
+
+			bool bFirstExample = true;
+			const char exampleStart[] = "<pre class=\"prettyprint  lang-agk \" style=\"border: 1px solid black; margin:14px; padding: 4px; font-size: 14px;background-color:#ffffff\">";
+			int nExampleStartLength = strlen(exampleStart);
+			int nExampleStartIndex = usExampleHtml.FindStr(exampleStart);
+			int nExampleCount = 0;
+			while (nExampleStartIndex >= 0)
+			{
+				int nExampleEndIndex = usExampleHtml.FindStr("</pre>", 0, nExampleStartIndex);
+				if (nExampleEndIndex <= 0)
+					break;
+
+				if (bFirstExample)
+				{
+					bFirstExample = false;
+					parsedPage.Append("\\[h2]Examples\\[/h2]");
+				}
+
+				nExampleCount++;
+
+				char tmp[100];
+				sprintf(tmp, "\\[h3]%s %d\\[/h3]", "Example", nExampleCount);
+				parsedPage.Append(tmp);
+				uString usExample;
+				usExampleHtml.SubString(usExample, nExampleStartIndex + nExampleStartLength, nExampleEndIndex - (nExampleStartIndex + nExampleStartLength));
+				usExample.Prepend("\\[code]\\[p]<pre>");
+				usExample.Append("</pre>\\[/p]</div>");
+				strcpy(cHelpPage, usExample.GetStr());
+				parsedPage.Append(cHelpPage);
+				nExampleStartIndex = usExampleHtml.FindStr(exampleStart, 0, nExampleEndIndex);
+			}			
+		}
+
 		parsedPage.ReplaceStr("[a href", "\\[a href");
 
 		parsedPage.ReplaceStr("\n\r", "\n");
@@ -2047,6 +2245,10 @@ void processhelp(const char * page,bool readnewpage)
 	bool userawdata = false;
 	bool entercodemode = false;
 	button_count = 0;
+	// Clear clipboard text array for new page
+	for (int i = 0; i < max_button_count; i++) {
+		button_clipboard_text[i][0] = '\0';
+	}
 	style_colors = ImGui::GetStyle().Colors;
 	size = strlen(cHelpPagePath);
 	char *nav,*navend;
@@ -2358,17 +2560,27 @@ void processhelp(const char * page,bool readnewpage)
 									if (pImage) {
 										myTextureID = pImage->GetTextureID() + 100000; // 100000+ = No Color Array , 200000+ = No transparent
 										
+										// Center navigation buttons (prev.png and next.png are a pair)
 										if (strstr(limg, "prev.png")) {
+											// Position prev button: center minus (one button width + half spacing)
 											float fCenterX = fPreviewWidth * 0.5;
-											ImGui::SetCursorPos(ImVec2(fCenterX - (iImgW*fRatio) - 8, ImGui::GetCursorPosY())); //TitleSize
+											ImGui::SetCursorPos(ImVec2(fCenterX - (iImgW*fRatio) - 8, ImGui::GetCursorPosY()));
 										}
-										if (strstr(limg, "next.png")) {
+										else if (strstr(limg, "next.png")) {
+											// Position next button: center plus half spacing
 											float fCenterX = fPreviewWidth * 0.5;
-											ImGui::SetCursorPos(ImVec2(fCenterX + 8, ImGui::GetCursorPosY())); //TitleSize
+											ImGui::SetCursorPos(ImVec2(fCenterX + 8, ImGui::GetCursorPosY()));
 										}
-										//float fCenterX = (fPreviewWidth - iImgW*fRatio) * 0.5;
-										//ImGui::SetCursorPos(ImVec2(fCenterX + 2, ImGui::GetCursorPosY())); //TitleSize
-										if (ImGui::ImageButton((void*)myTextureID, ImVec2(iImgW*fRatio, iImgH*fRatio), ImVec2(0, 0), ImVec2(1, 1), -5, ImVec4(0, 0, 0, 0), ImVec4(1, 1, 1, 1))) {
+										else {
+											// Center single images
+											float fCenterX = (fPreviewWidth - iImgW*fRatio) * 0.5;
+											ImGui::SetCursorPos(ImVec2(fCenterX + 2, ImGui::GetCursorPosY()));
+										}
+										// Fix for Dear ImGui 1.89+: Wrap ImageButton with PushID/PopID to ensure unique IDs
+										// when multiple navigation buttons (prev.png, next.png) are present on the same page.
+										// Use iFoundImagesThisRun for stable ID across frames.
+										ImGui::PushID(iFoundImagesThisRun);
+										if (ImGui::ImageButton("##help_image", ImTextureRef((ImTextureID)(intptr_t)myTextureID), ImVec2(iImgW*fRatio, iImgH*fRatio), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 1, 1, 1))) {
 											//Link.
 											mlink = "";
 											finalLink = cHelpPagePath;
@@ -2380,6 +2592,7 @@ void processhelp(const char * page,bool readnewpage)
 											finalLink = mlink;
 											finalLink.Append(but_link);
 											//Show new link page.
+											ImGui::PopID();  // Pop before calling processhelp to maintain clean state
 											processhelp((char*)finalLink.GetStr(), true);
 											style_colors[ImGuiCol_Text] = oldTextColor;
 											ImGui::SetWindowFontScale(1.0);
@@ -2387,6 +2600,7 @@ void processhelp(const char * page,bool readnewpage)
 											//ImGui::EndColumns();
 											return;
 										}
+										ImGui::PopID();
 										//ImGui::SameLine();
 									}
 
@@ -2638,10 +2852,13 @@ void processhelp(const char * page,bool readnewpage)
 							myTextureID = pImage->GetTextureID() + 200000; // 100000+ = No Color Array , 200000+ = No transparent
 							float fCenterX = (fPreviewWidth - iImgW*fRatio) * 0.5;
 							ImGui::SetCursorPos(ImVec2(fCenterX + 2, ImGui::GetCursorPosY() )); //TitleSize
-							ImGui::ImageButton((void*)myTextureID, ImVec2(iImgW*fRatio, iImgH*fRatio), ImVec2(0, 0), ImVec2(1, 1), -5, ImVec4(0, 0, 0, 0), ImVec4(1, 1, 1, 1));
-						}
-
-					}
+							ImGui::Dummy(ImVec2(0, 0));
+						// Fix for Dear ImGui 1.89+: Wrap ImageButton with PushID/PopID to ensure unique IDs
+						// when multiple images are displayed on the same page.
+						ImGui::PushID(iFoundImagesThisRun);
+						ImGui::ImageButton("##help_image_display", ImTextureRef((ImTextureID)(intptr_t)myTextureID), ImVec2(iImgW*fRatio, iImgH*fRatio), ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), ImVec4(1, 1, 1, 1));
+						ImGui::PopID();
+					}					}
 					iFoundImagesThisRun++;
 					//debug.
 					//renderText.Append("\n[img=");

@@ -58,7 +58,6 @@ public:
 	UINT iFlags;
 	int m_iProjectCount;
 	bool m_bDisplayUnfolded;
-	bool m_bDisplayCollapsed;
 	int m_id;
 
 	//Android settings.
@@ -121,7 +120,7 @@ bool OpenProject(void);
 void RemoveProject(cProjectItem * removeProject);
 void ProjectMoveDown(cProjectItem * moveProject);
 void ProjectMoveUp(cProjectItem * moveProject);
-void SaveProjectFile(cProjectItem * mProject);
+void SaveProjectFile(cProjectItem * mProject, bool bSkipSorting = false);
 bool CompileProject(cProjectItem * mProject, bool run, bool broadcast, bool debug, char *useIP = NULL);
 void SaveAllOpenProjectEditedFiles(void);
 void CloseAllOpenProjectEditedFiles(void);
@@ -143,7 +142,6 @@ void CreateNewProjectFile(void);
 void CheckKeyboardShortcuts(void);
 
 void LoadProjectFile(char * cFileSelected);
-void SaveProjectFile(cProjectItem * mProject);
 
 cProjectItem::sProjectFiles * CreateNewAGCFile(char *cFileSelected = NULL, char *NameIt = NULL );
 void RemoveAGKFile(cProjectItem::sProjectFiles * m_pCurrentFile);

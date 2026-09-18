@@ -12,6 +12,7 @@ Global
 		DebugStaticTrial|x64 = DebugStaticTrial|x64
 		Release|x64 = Release|x64
 		ReleaseFree|x64 = ReleaseFree|x64
+		ReleaseGeany|x64 = ReleaseGeany|x64
 		ReleaseStaticLib|x64 = ReleaseStaticLib|x64
 		ReleaseStaticLibIDE|x64 = ReleaseStaticLibIDE|x64
 		ReleaseStaticTrial|x64 = ReleaseStaticTrial|x64
@@ -29,6 +30,8 @@ Global
 		{F57767D5-52F9-4B55-B5BB-3DACCDC4093A}.Release|x64.Build.0 = Release|x64
 		{F57767D5-52F9-4B55-B5BB-3DACCDC4093A}.ReleaseFree|x64.ActiveCfg = ReleaseFree|x64
 		{F57767D5-52F9-4B55-B5BB-3DACCDC4093A}.ReleaseFree|x64.Build.0 = ReleaseFree|x64
+		{F57767D5-52F9-4B55-B5BB-3DACCDC4093A}.ReleaseGeany|x64.ActiveCfg = ReleaseGeany|x64
+		{F57767D5-52F9-4B55-B5BB-3DACCDC4093A}.ReleaseGeany|x64.Build.0 = ReleaseGeany|x64
 		{F57767D5-52F9-4B55-B5BB-3DACCDC4093A}.ReleaseStaticLib|x64.ActiveCfg = ReleaseStaticLib|x64
 		{F57767D5-52F9-4B55-B5BB-3DACCDC4093A}.ReleaseStaticLib|x64.Build.0 = ReleaseStaticLib|x64
 		{F57767D5-52F9-4B55-B5BB-3DACCDC4093A}.ReleaseStaticLibIDE|x64.ActiveCfg = ReleaseStaticLibIDE|x64

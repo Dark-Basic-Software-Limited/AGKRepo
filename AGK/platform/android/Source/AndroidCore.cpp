@@ -1453,24 +1453,39 @@ void agk::PlatformInitGraphics( void* ptr, AGKRendererMode rendererMode, uint32_
 		g_pNativeWindow = data->window;
 	}
 
+	// Diagnostics: log requested mode and flags up-front
+	{
+		char msg[128];
+		snprintf( msg, 128, "InitGraphics requested mode=%d flags=0x%08X", (int)rendererMode, (unsigned int)flags );
+		AppInfo( msg );
+	}
+
 	// Vulkan does not yet support AR
 	if ( flags & AGK_PROGRAM_FLAG_USES_AR ) rendererMode = AGK_RENDERER_MODE_ONLY_LOWEST;
 	else if ( flags & AGK_PROGRAM_FLAG_USES_EXTERN_TEX )
 	{
 		rendererMode = AGK_RENDERER_MODE_ONLY_LOWEST;
 		// this requires NDK API 26+, we need NDK API 16 for backwards compatibility
-		/*
+		
 		// extensions required for video to texture or camera to texture
 		AddVulkanDeviceExtensions( "VK_ANDROID_external_memory_android_hardware_buffer" );
 		AddVulkanDeviceExtensions( "VK_KHR_sampler_ycbcr_conversion" );
 		AddVulkanDeviceExtensions( "VK_KHR_external_memory" );
 		AddVulkanDeviceExtensions( "VK_EXT_queue_family_foreign" );
-		*/
+		
 	}
 
-	// prefer OpenGLES over Vulkan, make sure using #renderer "Advanced" on Android will still drop down to OpenGLES
-	if ( rendererMode == AGK_RENDERER_MODE_PREFER_BEST ) rendererMode = AGK_RENDERER_MODE_ONLY_LOWEST;
-	if ( rendererMode == AGK_RENDERER_MODE_ONLY_ADVANCED ) rendererMode = AGK_RENDERER_MODE_PREFER_BEST;
+	// Diagnostics: log any override reason
+	if ( flags & AGK_PROGRAM_FLAG_USES_AR )
+	{
+		AppInfo( "Renderer override: AR flag present, forcing OpenGL ES" );
+	}
+	else if ( flags & AGK_PROGRAM_FLAG_USES_EXTERN_TEX )
+	{
+		AppInfo( "Renderer override: external texture flag present, forcing OpenGL ES" );
+	}
+
+	// Keep requested renderer mode for Android. Prefer Best will try Vulkan first and fallback to OpenGLES if needed.
 	
 	g_pRenderer = 0;
 	switch( rendererMode )
@@ -1507,6 +1522,7 @@ void agk::PlatformInitGraphics( void* ptr, AGKRendererMode rendererMode, uint32_
 		case AGK_RENDERER_MODE_PREFER_BEST:
 		{
 #ifndef DISABLE_VULKAN
+			AppInfo( "Prefer Best: attempting Vulkan first" );
 			int oldMode = m_iErrorMode;
 			SetErrorMode(1);
 			VulkanRenderer *pVulkanRenderer = new VulkanRenderer();
@@ -1522,6 +1538,13 @@ void agk::PlatformInitGraphics( void* ptr, AGKRendererMode rendererMode, uint32_
 			{
 				delete g_pRenderer;
 #endif
+				// Vulkan failed, log reason before falling back
+				uString err; agk::GetLastError(err);
+				{
+					char msg[512];
+					snprintf( msg, 512, "Prefer Best: Vulkan init failed, falling back to OpenGL ES (%s)", err.GetStr() );
+					AppInfo( msg );
+				}
 				SetErrorMode(oldMode);
 				g_pRenderer = new OpenGLES2Renderer();
 				if ( g_pRenderer->Init() == APP_SUCCESS ) 

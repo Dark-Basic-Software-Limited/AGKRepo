@@ -9,6 +9,7 @@
 #include "imgui.h"
 #include "imgui_draw.cpp"
 #include "imgui_widgets.cpp"
+#include "imgui_tables.cpp"
 #include "imconfig.h"
 #include "imgui.cpp"
 #include "imgui_impl_agk.h"
@@ -128,10 +129,11 @@ void    ImGui_ImplAGL_NewFrame()
 //PAUL: rem  io.DeltaTime = agk::GetFrameTime(); //PE: Daltetime same as AGK frame time.
 
 	// Read keyboard modifiers inputs
-	io.KeyCtrl = agk::GetRawKeyState(0x11); //VK_CONTROL same as in AGK.
-	io.KeyShift = agk::GetRawKeyState(0x10);
-	io.KeyAlt = agk::GetRawKeyState(0x12);
-	io.KeySuper = io.KeysDown[GLFW_KEY_LEFT_SUPER] || io.KeysDown[GLFW_KEY_RIGHT_SUPER];
+	// Modifiers via event API
+	io.AddKeyEvent(ImGuiKey_ModCtrl,  agk::GetRawKeyState(0x11) != 0);
+	io.AddKeyEvent(ImGuiKey_ModShift, agk::GetRawKeyState(0x10) != 0);
+	io.AddKeyEvent(ImGuiKey_ModAlt,   agk::GetRawKeyState(0x12) != 0);
+	io.AddKeyEvent(ImGuiKey_ModSuper, (agk::GetRawKeyState(0x5B) != 0) || (agk::GetRawKeyState(0x5C) != 0));
 	//io.KeySuper = false;
 
     // Update OS mouse position
@@ -145,36 +147,17 @@ void    ImGui_ImplAGL_NewFrame()
         ImGui_ImplAGL_UpdateMouseCursor();
 	}
 
-	//PE: Other input.
-//	if (agk::GetPointerPressed()) {
-	if (agk::GetPointerState()) {
+	// Mouse buttons and wheel via event API
+	if (agk::GetPointerPressed())  io.AddMouseButtonEvent(0, true);
+	if (agk::GetPointerReleased()) io.AddMouseButtonEvent(0, false);
+	if (agk::GetRawMouseRightPressed())  io.AddMouseButtonEvent(1, true);
+	if (agk::GetRawMouseRightReleased()) io.AddMouseButtonEvent(1, false);
+	if (agk::GetRawMouseMiddlePressed())  io.AddMouseButtonEvent(2, true);
+	if (agk::GetRawMouseMiddleReleased()) io.AddMouseButtonEvent(2, false);
+	if (float wheel = (float)agk::GetRawMouseWheelDelta() * 0.20f) io.AddMouseWheelEvent(0.0f, wheel);
 
-		io.MouseDown[0] = true;
-	}
-	if (agk::GetRawMouseRightPressed()) {
-		io.MouseDown[1] = true;
-	}
-	if (agk::GetRawMouseMiddlePressed()) {
-		io.MouseDown[2] = true;
-	}
-	if (agk::GetPointerReleased()) {
-		io.MouseDown[0] = false;
-	}
-	if (agk::GetRawMouseRightReleased()) {
-		io.MouseDown[1] = false;
-	}
-	if (agk::GetRawMouseMiddleReleased()) {
-		io.MouseDown[2] = false;
-	}
-
-	io.MouseWheel += agk::GetRawMouseWheelDelta() * 0.20; // GetRawMouseWheelDelta to fast so *0.2
-
-	for (int a = 0; a < 255; a++) {
-		io.KeysDown[a] = agk::GetRawKeyState(a);
-		if (a == 9 && agk::GetRawKeyPressed(a) ) {
-			io.AddInputCharacter((unsigned short) 9 );	//Add tab to char input.
-		}
-	}
+	if (agk::GetRawKeyPressed(9)) // VK_TAB
+		io.AddInputCharacter((unsigned short)9);
 
 	//PE: AGK GetCharBuffer same as WM_CHAR just converted to char , so convert back to unicode.
 	//This need to be done in the glfw callback.
@@ -314,7 +297,7 @@ void ImGui_ImplAGK_RenderDrawData(ImDrawData* draw_data)
 					//pShader->DrawIndices( (GLsizei)pcmd->ElemCount , (unsigned short *) idx_buffer , GL_TRIANGLES );
 
 					// Bind textures
-					GLuint useTexture = (GLuint)(intptr_t)pcmd->TextureId;
+					GLuint useTexture = (GLuint)(intptr_t)pcmd->GetTexID();
 
 					if (useTexture >= 300000) {
 						//PE: Render using no alpha and without color array.
@@ -400,7 +383,7 @@ bool ImGui_ImplOpenGL2_CreateFontsTexture()
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
 	// Store our identifier
-	io.Fonts->TexID = (ImTextureID)(intptr_t)g_FontTexture;
+	io.Fonts->SetTexID((ImTextureID)(intptr_t)g_FontTexture);
 
 	// Restore state
 	glBindTexture(GL_TEXTURE_2D, last_texture);
@@ -413,8 +396,8 @@ void ImGui_ImplOpenGL2_DestroyFontsTexture()
 	if (g_FontTexture)
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		glDeleteTextures(1, &g_FontTexture);
-		io.Fonts->TexID = 0;
+	glDeleteTextures(1, &g_FontTexture);
+	io.Fonts->SetTexID((ImTextureID)0);
 		g_FontTexture = 0;
 	}
 }

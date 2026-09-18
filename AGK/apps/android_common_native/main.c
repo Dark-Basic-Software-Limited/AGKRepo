@@ -767,8 +767,10 @@ void android_main(struct android_app* state) {
         // If animating, we loop until all events are read, then continue
         // to draw the next frame of animation.
 
-        while ( (ident=ALooper_pollAll( 0, NULL, &events, (void**)&source)) >= 0 )
-        {
+		// Use ALooper_pollOnce in a drain loop (ALooper_pollAll is deprecated/obsoleted in NDK r28)
+		do {
+			ident = ALooper_pollOnce( 0, NULL, &events, (void**)&source );
+			if ( ident < 0 ) break;
             // Process this event.
             if (source != NULL) {
                 source->process(state, source);
@@ -807,8 +809,8 @@ void android_main(struct android_app* state) {
             }
 
             // Check if we are exiting.
-            if (state->destroyRequested != 0)
-            {
+			if (state->destroyRequested != 0)
+			{
             	LOGI("Exiting");
 				// deleting anything here will cause an error if the activity is recreated since the native
 				// side of the end never truely ends. The thread stops but the heap remains. Also can't call
@@ -822,8 +824,8 @@ void android_main(struct android_app* state) {
                 //exit(0);
                 return;
             }
-			
-        }
+
+		} while ( ident >= 0 );
 
         if (engine.animating)
         {

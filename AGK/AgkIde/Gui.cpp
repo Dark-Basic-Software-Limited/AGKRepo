@@ -34,6 +34,18 @@ extern HWND g_agkhWnd;
 
 Preferences pref;
 
+// Track preferences session state for style toggles
+static bool s_prefSessionSnapshotValid = false;
+static bool s_prefSessionStyleTouched = false; // true if user toggled Custom/Seed during this Preferences session
+static ImVec4 s_prefSessionColors[ImGuiCol_COUNT];
+// Track active and restore modes: 0=None, 1=Custom, 2=Seed
+static int s_prefActiveMode = 0;
+static int s_prefRestoreModeOnDisable = 0;
+
+// Bridge accessors (externally referenced by modified imgui_widgets.cpp without including full gui.h)
+extern "C" bool GetScrollbarArrowsEnabled() { return pref.bEnableScrollbarArrows; }
+extern "C" float GetScrollbarArrowStep() { return pref.fScrollbarArrowStep; }
+
 //Key remapping list.
 const char* key_values[] = {
 	"##0","##1","##2","##3","##4","##5","##6","##7",
@@ -266,10 +278,21 @@ void ProcessPreferences(void) {
 	float fs = ImGui::CalcTextSize("#").x;
 
 	ImGui::SetNextWindowSize(ImVec2(36*ImGui::GetFontSize(), 32* ImGui::GetFontSize()), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowPosCenter(ImGuiCond_Once);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
 
 	ImGuiWindowFlags window_flags = 0;
 	ImGui::Begin("Preferences", &pref.show_preferences_window, window_flags);
+
+	// New session: reset snapshot/touched state
+	if (ImGui::IsWindowAppearing()) {
+		s_prefSessionSnapshotValid = false;
+		s_prefSessionStyleTouched = false;
+		// Initialize active mode from persisted prefs on session start
+		if (pref.bEnableCustomStyle)      { s_prefActiveMode = 1; }
+		else if (pref.bEnableSeedStyle)   { s_prefActiveMode = 2; }
+		else                              { s_prefActiveMode = 0; }
+		s_prefRestoreModeOnDisable = 0;
+	}
 
 	int inputcolx = fs * 18;
 	//Tabs
@@ -328,12 +351,7 @@ void ProcessPreferences(void) {
 			bTmp = pref.iTabHideDropdown;
 			if (ImGui::Checkbox("Hide Tab Dropdown Button", &bTmp)) {
 				pref.iTabHideDropdown = bTmp;
-				ImGuiIO& io = ImGui::GetIO(); // (void)io;
-				if(pref.iTabHideDropdown)
-					io.ConfigFlags |= ImGuiConfigFlags_DockNoCollapsButton;
-				else
-					io.ConfigFlags &= ~ImGuiConfigFlags_DockNoCollapsButton;
-
+				// Note: Dock menu button is controlled per dockspace node via ImGuiDockNodeFlags_NoWindowMenuButton.
 			}
 			pref.iTabHideDropdown = bTmp;
 			
@@ -348,15 +366,16 @@ void ProcessPreferences(void) {
 			bTmp = pref.iRememberTabOrder;
 			ImGui::Checkbox("Remember Editor Tab Order", &bTmp);
 			pref.iRememberTabOrder = bTmp;
-			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Will remember the order of Visible tabs.\nNon-visible tabs will be in a-z order.");
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Will remember the order of Visible tabs");
 
+#ifdef AGK_WINDOWS
 			bTmp = pref.bBrowserHelp;
 			ImGui::Checkbox("Enable F1 Browser Help", &bTmp);
 			pref.bBrowserHelp = bTmp;
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Use browser help instead of the built in help");
+#endif
 
 			ImGui::Separator();
-
 
 			ImGui::SliderInt("Scene: Float Decimal Precision", &pref.iSceneLowFloatPrecision, 0, 8);
 			//ImGui::Checkbox("Scene Editor: Use 2 Decimal Precision For Float", &pref.bSceneLowFloatPrecision);
@@ -398,8 +417,6 @@ void ProcessPreferences(void) {
 				ChangeIconSet();
 				ResetLayout();
 			}
-			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Note: This will reset your current layout.");
-
 			ImGui::SameLine();
 			if (ImGui::Checkbox("Extra Large Icons", &pref.bEnableToolbarExtraLargeIcons)) {
 				pref.bEnableToolbarLargeIcons = false;
@@ -407,6 +424,14 @@ void ProcessPreferences(void) {
 				ResetLayout();
 			}
 			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Note: This will reset your current layout.");
+
+			// Scrollbar settings
+			ImGui::Checkbox("Show Scrollbar Arrows", &pref.bEnableScrollbarArrows);
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("Toggle arrow buttons at the ends of scrollbars");
+			if (pref.bEnableScrollbarArrows) {
+				ImGui::SliderFloat("Scrollbar Arrow Step", &pref.fScrollbarArrowStep, 0.5f, 10.0f, "%.1fx");
+				if (ImGui::IsItemHovered()) ImGui::SetTooltip("Scroll distance per click = step * font size");
+			}
 
 			ImGui::Checkbox("Only Display Active Project Files", &pref.bDisplayActiveProjectFilesOnly);
 
@@ -430,11 +455,12 @@ void ProcessPreferences(void) {
 				ImGui::EndTooltip();
 			}
 
-			ImGui::Checkbox("Restore Layout on Startup.", &pref.save_layout);
+			ImGui::Checkbox("Restore Layout on Startup", &pref.save_layout);
 
+			bool bTmp;
 
-			bool bTmp = pref.iCancelQuitDialog;
-			ImGui::Checkbox("Ask Before Quitting AppGameKit Studio.", &bTmp);
+			bTmp = pref.iCancelQuitDialog;
+			ImGui::Checkbox("Ask Before Quitting AppGameKit Studio", &bTmp);
 			pref.iCancelQuitDialog = bTmp;
 
 			ImGui::Text("Toolbar Icon Set:");
@@ -485,7 +511,7 @@ void ProcessPreferences(void) {
 	
 			extern unsigned int os_messages_sleeptime;
 			bool bState = pref.iIDEUpdateEventSleep;
-			ImGui::Checkbox("Event based rendering.", &pref.iIDEUpdateEventSleep);
+			ImGui::Checkbox("Event based rendering", &pref.iIDEUpdateEventSleep);
 
 			if (bState != pref.iIDEUpdateEventSleep) {
 				rb_change = true;
@@ -533,7 +559,7 @@ void ProcessPreferences(void) {
 			ImGui::Text("Build Options:");
 
 			//ImGui::Checkbox("Windows 64-bit", &pref.bWindows64Bit); // now always 64-bit
-			ImGui::Checkbox("Windows Timestamp exe for Faster 'Run'.", &pref.bTimestampExe);
+			ImGui::Checkbox("Windows Timestamp exe for Faster 'Run'", &pref.bTimestampExe);
 			
 			ImGui::Text("");
 			ImGui::Text("Broadcast:");
@@ -555,9 +581,9 @@ void ProcessPreferences(void) {
 			ImGui::Checkbox("Auto Hide Debug Window", &pref.bAutoHideDebugWindows);
 
 //			ImGui::Checkbox("On Debug Start, Bring Debugger to Front", &pref.bDebugBringToFront);
-			ImGui::Checkbox("On Debug Start, Update Watches and Status.", &pref.bDebugBringToFront);
+			ImGui::Checkbox("On Debug Start, Update Watches and Status", &pref.bDebugBringToFront);
 #ifdef AGK_WINDOWS
-			ImGui::Checkbox("On Debug Try to Bring App to Front.", &pref.bDebugBringAppToFront);
+			ImGui::Checkbox("On Debug Try to Bring App to Front", &pref.bDebugBringAppToFront);
 #endif
 
 			//debug_hwnd
@@ -570,53 +596,67 @@ void ProcessPreferences(void) {
 		if (ImGui::BeginTabItem(" Style Generator "))
 		{
 
-			ImGui::Checkbox("Enable HUE Based Style", &pref.bEnableCustomStyle);
+			// Handle Custom GUI Colors toggle with change detection
+			bool prevCustom = pref.bEnableCustomStyle;
+			bool prevSeedForCustom = pref.bEnableSeedStyle;
+			bool customChanged = ImGui::Checkbox("Enable Custom GUI Colors", &pref.bEnableCustomStyle);
 
 			if (pref.bEnableCustomStyle) {
 				pref.bEnableSeedStyle = false;
 				bEnableSeedStyleChanged = false;
 
+				// On first enable within this session, capture a snapshot of the current style
+				if (customChanged && pref.bEnableCustomStyle && !s_prefSessionSnapshotValid) {
+					ImVec4* cur = ImGui::GetStyle().Colors;
+					for (int i = 0; i < ImGuiCol_COUNT; ++i) s_prefSessionColors[i] = cur[i];
+					s_prefSessionSnapshotValid = true;
+					s_prefSessionStyleTouched = true;
+				}
+
+				// Track mode switching so unchecking can restore previous mode
+				if (customChanged && prevCustom == false) {
+					s_prefRestoreModeOnDisable = prevSeedForCustom ? 2 : 0;
+					s_prefActiveMode = 1;
+				}
+
 				ImGuiStyle& style = ImGui::GetStyle();
 
 				//recall preferences
-				static int mainhue = pref.gui_main_hue;
-				static int areahue = pref.gui_area_hue;
-				static int backhue = pref.gui_back_hue;
-				static int texthue = pref.gui_text_hue;
+				static float col_main_hue = pref.gui_col_main_hue;
 				static float col_main_sat = pref.gui_col_main_sat;
 				static float col_main_val = pref.gui_col_main_val;
+				static float col_area_hue = pref.gui_col_area_hue;
 				static float col_area_sat = pref.gui_col_area_sat;
 				static float col_area_val = pref.gui_col_area_val;
+				static float col_back_hue = pref.gui_col_back_hue;
 				static float col_back_sat = pref.gui_col_back_sat;
 				static float col_back_val = pref.gui_col_back_val;
+				static float col_text_hue = pref.gui_col_text_hue;
 				static float col_text_sat = pref.gui_col_text_sat;
 				static float col_text_val = pref.gui_col_text_val;
+				static float col_scroll_hue = pref.gui_col_scroll_hue;
+				static float col_scroll_sat = pref.gui_col_scroll_sat;
+				static float col_scroll_val = pref.gui_col_scroll_val;
 
 				//set hues
-				ImVec4 col_main = ImColor::HSV(mainhue / 255.f, col_main_sat, col_main_val);
-				ImVec4 col_area = ImColor::HSV(areahue / 255.f, col_area_sat, col_area_val);
-				ImVec4 col_back = ImColor::HSV(backhue / 255.f, col_back_sat, col_back_val);
-				ImVec4 col_text = ImColor::HSV(texthue / 255.f, col_text_sat, col_text_val);
+				ImVec4 col_main = ImColor::HSV(col_main_hue, col_main_sat, col_main_val);
+				ImVec4 col_area = ImColor::HSV(col_area_hue, col_area_sat, col_area_val);
+				ImVec4 col_back = ImColor::HSV(col_back_hue, col_back_sat, col_back_val);
+				ImVec4 col_text = ImColor::HSV(col_text_hue, col_text_sat, col_text_val);
+				ImVec4 col_scroll = ImColor::HSV(col_scroll_hue, col_scroll_sat, col_scroll_val);
 
-				float dummy;
 				ImVec4 rgb;
 				//ImGui::ColorEditMode(ImGuiColorEditMode_HSV);
 			
 				//main 
-				ImGui::SliderInt("Main Hue", &mainhue, 0, 255);
-				ImGui::ColorConvertHSVtoRGB(mainhue / 255.f, col_main_sat, col_main_val, rgb.x, rgb.y, rgb.z);
-				ImGui::ColorEdit3("Main HSV", &rgb.x, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_HSV);
-				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, dummy, col_main_sat, col_main_val);
+				ImGui::ColorConvertHSVtoRGB(col_main_hue, col_main_sat, col_main_val, rgb.x, rgb.y, rgb.z);
+				ImGui::ColorEdit3("Main RGB", &rgb.x);
+				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, col_main_hue, col_main_sat, col_main_val);
 				style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.68f);
 				style.Colors[ImGuiCol_FrameBgActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
 				style.Colors[ImGuiCol_TitleBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.65f);
 				style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(col_main.x, col_main.y, col_main.z, 0.35f);
 				style.Colors[ImGuiCol_TitleBgActive] = ImVec4(col_main.x, col_main.y, col_main.z, 0.78f);
-				style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.31f);
-				style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.78f); 
-				style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f); 
-				style.Colors[ImGuiCol_SliderGrab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.24f); 
-				style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f); 
 				style.Colors[ImGuiCol_Button] = ImVec4(col_main.x, col_main.y, col_main.z, 0.44f);
 				style.Colors[ImGuiCol_ButtonHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.86f);
 				style.Colors[ImGuiCol_ButtonActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
@@ -629,7 +669,6 @@ void ProcessPreferences(void) {
 				style.Colors[ImGuiCol_PlotLinesHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
 				style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
 				style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.43f);
-				style.Colors[ImGuiCol_PopupBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.92f);
 				style.Colors[ImGuiCol_Tab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.76f);
 				style.Colors[ImGuiCol_TabHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.86f);
 				style.Colors[ImGuiCol_TabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.0f);
@@ -637,34 +676,32 @@ void ProcessPreferences(void) {
 				style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(col_main.x, col_main.y, col_main.z, 0.86f);
 
 				//area
-				ImGui::SliderInt("Area Hue", &areahue, 0, 255);
-				ImGui::ColorConvertHSVtoRGB(areahue / 255.f, col_area_sat, col_area_val, rgb.x, rgb.y, rgb.z);
+				ImGui::ColorConvertHSVtoRGB(col_area_hue, col_area_sat, col_area_val, rgb.x, rgb.y, rgb.z);
 				ImGui::ColorEdit3("Area RGB", &rgb.x);
-				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, dummy, col_area_sat, col_area_val);
+				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, col_area_hue, col_area_sat, col_area_val);
 				style.Colors[ImGuiCol_FrameBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
 				style.Colors[ImGuiCol_MenuBarBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.57f);
 				style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
-				style.Colors[ImGuiCol_ChildWindowBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.00f);
+				style.Colors[ImGuiCol_ChildBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.00f);
 				//style.Colors[ImGuiCol_ComboBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
 	
 				//background
-				ImGui::SliderInt("Background Hue", &backhue, 0, 255);
-				ImGui::ColorConvertHSVtoRGB(backhue / 255.f, col_back_sat, col_back_val, rgb.x, rgb.y, rgb.z);
+				ImGui::ColorConvertHSVtoRGB(col_back_hue, col_back_sat, col_back_val, rgb.x, rgb.y, rgb.z);
 				ImGui::ColorEdit3("Background RGB", &rgb.x);
-				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, dummy, col_back_sat, col_back_val);
+				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, col_back_hue, col_back_sat, col_back_val);
 				style.Colors[ImGuiCol_WindowBg] = ImVec4(col_back.x, col_back.y, col_back.z, 1.00f);
+				style.Colors[ImGuiCol_PopupBg] = ImVec4(col_back.x, col_back.y, col_back.z, 0.92f);
 
 				//text
-				ImGui::SliderInt("Text Hue", &texthue, 0, 255);
-				ImGui::ColorConvertHSVtoRGB(texthue / 255.f, col_text_sat, col_text_val, rgb.x, rgb.y, rgb.z);
+				ImGui::ColorConvertHSVtoRGB(col_text_hue, col_text_sat, col_text_val, rgb.x, rgb.y, rgb.z);
 				ImGui::ColorEdit3("Text RGB", &rgb.x);
-				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, dummy, col_text_sat, col_text_val);
+				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, col_text_hue, col_text_sat, col_text_val);
 				style.Colors[ImGuiCol_Text] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
 				style.Colors[ImGuiCol_TextDisabled] = ImVec4(col_text.x, col_text.y, col_text.z, 0.58f);
 				style.Colors[ImGuiCol_Border] = ImVec4(col_text.x, col_text.y, col_text.z, 0.30f);
-				style.Colors[ImGuiCol_Column] = ImVec4(col_text.x, col_text.y, col_text.z, 0.32f);
-				style.Colors[ImGuiCol_ColumnHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.78f);
-				style.Colors[ImGuiCol_ColumnActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
+				style.Colors[ImGuiCol_Separator] = ImVec4(col_text.x, col_text.y, col_text.z, 0.32f);
+				style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.78f);
+				style.Colors[ImGuiCol_SeparatorActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
 				style.Colors[ImGuiCol_PlotHistogram] = ImVec4(col_text.x, col_text.y, col_text.z, 0.63f);
 				style.Colors[ImGuiCol_PlotLines] = ImVec4(col_text.x, col_text.y, col_text.z, 0.63f);
 				style.Colors[ImGuiCol_CheckMark] = ImVec4(col_text.x, col_text.y, col_text.z, 0.80f);
@@ -672,39 +709,68 @@ void ProcessPreferences(void) {
 				//style.Colors[ImGuiCol_CloseButtonHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.39f);
 				//style.Colors[ImGuiCol_CloseButtonActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
 
+				//scroll & slider
+				ImGui::ColorConvertHSVtoRGB(col_scroll_hue, col_scroll_sat, col_scroll_val, rgb.x, rgb.y, rgb.z);
+				ImGui::ColorEdit3("Scroll & Slider RGB", &rgb.x);
+				ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, col_scroll_hue, col_scroll_sat, col_scroll_val);
+				style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 0.50f); //0.31
+				style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 0.78f);
+				style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 1.00f);
+				style.Colors[ImGuiCol_SliderGrab] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 0.50f); //0.24
+				style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 1.00f);
+
 				//fixed colours
 				style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-				style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
+				//style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
 				style.Colors[ImGuiCol_DockingPreview] = ImVec4(0.38f, 0.48f, 0.60f, 1.00f);
 				style.Colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
 				style.Colors[ImGuiCol_NavHighlight] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
 				style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 1.0f);
 				style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
-				style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.6f);
+				style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.0f);
 
 				//save changes to prefs
-				pref.gui_main_hue = mainhue;
-				pref.gui_area_hue = areahue;
-				pref.gui_back_hue = backhue;
-				pref.gui_text_hue = texthue;
+				pref.gui_col_main_hue = col_main_hue;
 				pref.gui_col_main_sat = col_main_sat;
 				pref.gui_col_main_val = col_main_val;
+				pref.gui_col_area_hue = col_area_hue;
 				pref.gui_col_area_sat = col_area_sat;
 				pref.gui_col_area_val = col_area_val;
+				pref.gui_col_back_hue = col_back_hue;
 				pref.gui_col_back_sat = col_back_sat;
 				pref.gui_col_back_val = col_back_val;
+				pref.gui_col_text_hue = col_text_hue;
 				pref.gui_col_text_sat = col_text_sat;
 				pref.gui_col_text_val = col_text_val;
+				pref.gui_col_scroll_hue = col_scroll_hue;
+				pref.gui_col_scroll_sat = col_scroll_sat;
+				pref.gui_col_scroll_val = col_scroll_val;
 
 				//iIDESelectedStyle
 			}
 
 			bool bOldState = pref.bEnableSeedStyle;
-			ImGui::Checkbox("Enable Seed Generated Style", &pref.bEnableSeedStyle);
+			// Handle Seed Style toggle with change detection
+			bool prevCustomForSeed = pref.bEnableCustomStyle;
+			bool seedChanged = ImGui::Checkbox("Enable Seed Generated Style", &pref.bEnableSeedStyle);
 
 			if (pref.bEnableSeedStyle) {
 				pref.bEnableCustomStyle = false;
 				bEnableSeedStyleChanged = false;
+
+				// On first enable within this session, capture a snapshot of the current style
+				if (seedChanged && pref.bEnableSeedStyle && !s_prefSessionSnapshotValid) {
+					ImVec4* cur = ImGui::GetStyle().Colors;
+					for (int i = 0; i < ImGuiCol_COUNT; ++i) s_prefSessionColors[i] = cur[i];
+					s_prefSessionSnapshotValid = true;
+					s_prefSessionStyleTouched = true;
+				}
+
+				// Track mode switching so unchecking can restore previous mode
+				if (seedChanged && bOldState == false) {
+					s_prefRestoreModeOnDisable = prevCustomForSeed ? 1 : 0;
+					s_prefActiveMode = 2;
+				}
 
 				if (ImGui::InputInt("Seed Value", &pref.iSeedStyle, 1, 10)) {
 					SetSeedStyleColors();
@@ -723,11 +789,42 @@ void ProcessPreferences(void) {
 			
 			}
 
+			// If user unchecked Custom and previously had Seed active, re-enable Seed within this session
+			if (customChanged && !pref.bEnableCustomStyle) {
+				if (s_prefRestoreModeOnDisable == 2) {
+					pref.bEnableSeedStyle = true;
+					pref.bEnableCustomStyle = false;
+					SetSeedStyleColors();
+					s_prefActiveMode = 2;
+					s_prefRestoreModeOnDisable = 0; // consumed
+					bEnableSeedStyleChanged = false;
+				}
+			}
 
+			// If user unchecked Seed and previously had Custom active, re-enable Custom within this session
+			if (seedChanged && !pref.bEnableSeedStyle) {
+				if (s_prefRestoreModeOnDisable == 1) {
+					pref.bEnableCustomStyle = true;
+					pref.bEnableSeedStyle = false;
+					CustomStyleColors(NULL);
+					s_prefActiveMode = 1;
+					s_prefRestoreModeOnDisable = 0; // consumed
+					bEnableSeedStyleChanged = false;
+				}
+			}
+
+			// When both toggles are off, decide what to do based on this session's interaction
 			if(!pref.bEnableSeedStyle && !pref.bEnableCustomStyle){
 				if (!bEnableSeedStyleChanged ) {
-					myDefaultStyle(NULL);
-					pref.idePalette = 0;
+					if (s_prefSessionStyleTouched && s_prefSessionSnapshotValid) {
+						// Within-session revert: restore snapshot of the style present when the user first toggled on
+						ImVec4* colors = ImGui::GetStyle().Colors;
+						for (int i = 0; i < ImGuiCol_COUNT; ++i) colors[i] = s_prefSessionColors[i];
+					} else {
+						// New session (no toggles touched): fallback to default style
+						myDefaultStyle(NULL);
+						pref.idePalette = 0;
+					}
 					bEnableSeedStyleChanged = true;
 				}
 			}
@@ -1737,6 +1834,132 @@ void ProcessPreferences(void) {
 			ImGui::SameLine();
 			ImGui::Text(pref.cGotoLineText);
 
+			//#########################
+			//#### COMMENT LINES ######
+			//#########################
+			key_changed = false;
+			ImGui::Text("Comment Lines: ");
+			ImGui::SameLine();
+			ImGui::SetCursorPos(ImVec2(cpos, ImGui::GetCursorPos().y));
+			if (is_osx) { if (ImGui::Checkbox("cmd##CommentLines", &pref.bCommentLinesCtrl)) key_changed = true; }
+			else { if (ImGui::Checkbox("ctrl##CommentLines", &pref.bCommentLinesCtrl)) key_changed = true; }
+			ImGui::SameLine();
+			if (ImGui::Checkbox("shift##CommentLines", &pref.bCommentLinesShift)) key_changed = true;
+			ImGui::SameLine();
+			if (ImGui::Checkbox("alt##CommentLines", &pref.bCommentLinesAlt)) key_changed = true;
+
+			ImGui::SameLine();
+			ImGui::PushItemWidth(fs * 16);
+			if (pref.iCommentLinesKey > IM_ARRAYSIZE(key_values)) pref.iCommentLinesKey = 69; //E
+			if (ImGui::BeginCombo("##comboCommentLines", key_values[pref.iCommentLinesKey], 0))
+			{
+				for (int n = 0; n < IM_ARRAYSIZE(key_values); n++)
+				{
+					bool is_selected = (pref.iCommentLinesKey == n);
+					if (strncmp(key_values[n], "##", 2) != 0)
+						if (ImGui::Selectable(key_values[n], is_selected)) { pref.iCommentLinesKey = n; key_changed = true; if (is_selected) ImGui::SetItemDefaultFocus(); }
+				}
+				ImGui::EndCombo();
+			}
+			if (key_changed) {
+				uString ktext = key_values[pref.iCommentLinesKey];
+				ktext.ReplaceStr("KEY_", "");
+				ktext.ReplaceStr("SUBTRACT", "-");
+				ktext.ReplaceStr("PLUS", "+");
+				strcpy(pref.cCommentLinesText, "");
+				if (pref.bCommentLinesCtrl) strcat(pref.cCommentLinesText, is_osx ? "Cmd+" : "Ctrl+");
+				if (pref.bCommentLinesShift) strcat(pref.cCommentLinesText, "Shift+");
+				if (pref.bCommentLinesAlt) strcat(pref.cCommentLinesText, "Alt+");
+				strcat(pref.cCommentLinesText, ktext);
+			}
+			ImGui::PopItemWidth();
+			ImGui::SameLine();
+			ImGui::Text(pref.cCommentLinesText);
+
+			//###########################
+			//#### UNCOMMENT LINES ######
+			//###########################
+			key_changed = false;
+			ImGui::Text("Uncomment Lines: ");
+			ImGui::SameLine();
+			ImGui::SetCursorPos(ImVec2(cpos, ImGui::GetCursorPos().y));
+			if (is_osx) { if (ImGui::Checkbox("cmd##UncommentLines", &pref.bUncommentLinesCtrl)) key_changed = true; }
+			else { if (ImGui::Checkbox("ctrl##UncommentLines", &pref.bUncommentLinesCtrl)) key_changed = true; }
+			ImGui::SameLine();
+			if (ImGui::Checkbox("shift##UncommentLines", &pref.bUncommentLinesShift)) key_changed = true;
+			ImGui::SameLine();
+			if (ImGui::Checkbox("alt##UncommentLines", &pref.bUncommentLinesAlt)) key_changed = true;
+
+			ImGui::SameLine();
+			ImGui::PushItemWidth(fs * 16);
+			if (pref.iUncommentLinesKey > IM_ARRAYSIZE(key_values)) pref.iUncommentLinesKey = 69; //E
+			if (ImGui::BeginCombo("##comboUncommentLines", key_values[pref.iUncommentLinesKey], 0))
+			{
+				for (int n = 0; n < IM_ARRAYSIZE(key_values); n++)
+				{
+					bool is_selected = (pref.iUncommentLinesKey == n);
+					if (strncmp(key_values[n], "##", 2) != 0)
+						if (ImGui::Selectable(key_values[n], is_selected)) { pref.iUncommentLinesKey = n; key_changed = true; if (is_selected) ImGui::SetItemDefaultFocus(); }
+				}
+				ImGui::EndCombo();
+			}
+			if (key_changed) {
+				uString ktext = key_values[pref.iUncommentLinesKey];
+				ktext.ReplaceStr("KEY_", "");
+				ktext.ReplaceStr("SUBTRACT", "-");
+				ktext.ReplaceStr("PLUS", "+");
+				strcpy(pref.cUncommentLinesText, "");
+				if (pref.bUncommentLinesCtrl) strcat(pref.cUncommentLinesText, is_osx ? "Cmd+" : "Ctrl+");
+				if (pref.bUncommentLinesShift) strcat(pref.cUncommentLinesText, "Shift+");
+				if (pref.bUncommentLinesAlt) strcat(pref.cUncommentLinesText, "Alt+");
+				strcat(pref.cUncommentLinesText, ktext);
+			}
+			ImGui::PopItemWidth();
+			ImGui::SameLine();
+			ImGui::Text(pref.cUncommentLinesText);
+
+			//###############################
+			//#### TOGGLE COMMENT LINE ######
+			//###############################
+			key_changed = false;
+			ImGui::Text("Toggle Comment Line: ");
+			ImGui::SameLine();
+			ImGui::SetCursorPos(ImVec2(cpos, ImGui::GetCursorPos().y));
+			if (is_osx) { if (ImGui::Checkbox("cmd##ToggleComment", &pref.bToggleCommentCtrl)) key_changed = true; }
+			else { if (ImGui::Checkbox("ctrl##ToggleComment", &pref.bToggleCommentCtrl)) key_changed = true; }
+			ImGui::SameLine();
+			if (ImGui::Checkbox("shift##ToggleComment", &pref.bToggleCommentShift)) key_changed = true;
+			ImGui::SameLine();
+			if (ImGui::Checkbox("alt##ToggleComment", &pref.bToggleCommentAlt)) key_changed = true;
+
+			ImGui::SameLine();
+			ImGui::PushItemWidth(fs * 16);
+			if (pref.iToggleCommentKey > IM_ARRAYSIZE(key_values)) pref.iToggleCommentKey = 69; //E
+			if (ImGui::BeginCombo("##comboToggleComment", key_values[pref.iToggleCommentKey], 0))
+			{
+				for (int n = 0; n < IM_ARRAYSIZE(key_values); n++)
+				{
+					bool is_selected = (pref.iToggleCommentKey == n);
+					if (strncmp(key_values[n], "##", 2) != 0)
+						if (ImGui::Selectable(key_values[n], is_selected)) { pref.iToggleCommentKey = n; key_changed = true; if (is_selected) ImGui::SetItemDefaultFocus(); }
+				}
+				ImGui::EndCombo();
+			}
+			if (key_changed) {
+				uString ktext = key_values[pref.iToggleCommentKey];
+				ktext.ReplaceStr("KEY_", "");
+				ktext.ReplaceStr("SUBTRACT", "-");
+				ktext.ReplaceStr("PLUS", "+");
+				strcpy(pref.cToggleCommentText, "");
+				if (pref.bToggleCommentCtrl) strcat(pref.cToggleCommentText, is_osx ? "Cmd+" : "Ctrl+");
+				if (pref.bToggleCommentShift) strcat(pref.cToggleCommentText, "Shift+");
+				if (pref.bToggleCommentAlt) strcat(pref.cToggleCommentText, "Alt+");
+				strcat(pref.cToggleCommentText, ktext);
+			}
+			ImGui::PopItemWidth();
+			ImGui::SameLine();
+			ImGui::Text(pref.cToggleCommentText);
+
 			//#############
 			//#### RUN ####
 			//#############
@@ -2044,6 +2267,68 @@ void ProcessPreferences(void) {
 			ImGui::PopItemWidth();
 			ImGui::SameLine();
 			ImGui::Text(pref.cDebugStepText);
+
+			//###########################
+			//#### BREAKPOINT TOGGLE ####
+			//###########################
+
+			key_changed = false;
+			ImGui::Text("BreakPoint Toggle: ");
+			ImGui::SameLine();
+			ImGui::SetCursorPos(ImVec2(cpos, ImGui::GetCursorPos().y));
+			if (is_osx) {
+				if (ImGui::Checkbox("cmd##BreakPointToggle", &pref.bBreakPointToggleCtrl)) key_changed = true;
+			}
+			else {
+				if (ImGui::Checkbox("ctrl##BreakPointToggle", &pref.bBreakPointToggleCtrl)) key_changed = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Checkbox("shift##BreakPointToggle", &pref.bBreakPointToggleShift)) key_changed = true;
+			ImGui::SameLine();
+			if (ImGui::Checkbox("alt##BreakPointToggle", &pref.bBreakPointToggleAlt)) key_changed = true;
+
+			ImGui::SameLine();
+			ImGui::PushItemWidth(fs * 16);
+
+			if (pref.iBreakPointToggleKey > IM_ARRAYSIZE(key_values))
+				pref.iBreakPointToggleKey = 89;
+
+			if (ImGui::BeginCombo("##comboBreakPointTogglevalues", key_values[pref.iBreakPointToggleKey], 0))
+			{
+				for (int n = 0; n < IM_ARRAYSIZE(key_values); n++)
+				{
+					bool is_selected = (pref.iBreakPointToggleKey == n);
+					if (strncmp(key_values[n], "##", 2) != 0)
+						if (ImGui::Selectable(key_values[n], is_selected)) {
+							pref.iBreakPointToggleKey = n;
+							key_changed = true;
+							if (is_selected)
+								ImGui::SetItemDefaultFocus();
+						}
+				}
+				ImGui::EndCombo();
+			}
+			if (key_changed) {
+				uString ktext = key_values[pref.iBreakPointToggleKey];
+				ktext.ReplaceStr("KEY_", "");
+				ktext.ReplaceStr("SUBTRACT", "-");
+				ktext.ReplaceStr("PLUS", "+");
+				strcpy(pref.cBreakPointToggleText, "");
+				if (pref.bBreakPointToggleCtrl) {
+					if (is_osx)
+						strcat(pref.cBreakPointToggleText, "Cmd+");
+					else
+						strcat(pref.cBreakPointToggleText, "Ctrl+");
+				}
+				if (pref.bBreakPointToggleShift)
+					strcat(pref.cBreakPointToggleText, "Shift+");
+				if (pref.bBreakPointToggleAlt)
+					strcat(pref.cBreakPointToggleText, "Alt+");
+				strcat(pref.cBreakPointToggleText, ktext);
+			}
+			ImGui::PopItemWidth();
+			ImGui::SameLine();
+			ImGui::Text(pref.cBreakPointToggleText);
 
 
 			//###################
@@ -2558,7 +2843,7 @@ void ProcessCodeProperties(void)
 								else
 									ImGui::PushItemWidth(130);
 								if (iInPutType == 1) {
-									if (ImGui::InputFloat(uniqueLabel, &tmpfloat, 0.01, 0.1, 6)) {
+									if (ImGui::InputFloat(uniqueLabel, &tmpfloat, 0.01f, 0.1f, "%.6f")) {
 										//Update value.
 										cmd.SubString(newcmd, 0, pos3 + pos3_length);
 										cmd.SubString(rest, pos4);
@@ -2995,19 +3280,19 @@ void ProcessCodeProperties(void)
 									uniqueLabel = " X"; //var;
 									uniqueLabel.Append("##IDEGUIinput");
 									uniqueLabel.AppendInt((int)it->second.lineno);
-									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.x,0.01,0.1,6)) {
+									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.x, 0.01f, 0.1f, "%.6f")) {
 										bSetVec4 = true;
 									}
 									uniqueLabel = " Y"; //var;
 									uniqueLabel.Append("##IDEGUIinput");
 									uniqueLabel.AppendInt((int)it->second.lineno);
-									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.y, 0.01, 0.1, 6)) {
+									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.y, 0.01f, 0.1f, "%.6f")) {
 										bSetVec4 = true;
 									}
 									uniqueLabel = " Z"; //var;
 									uniqueLabel.Append("##IDEGUIinput");
 									uniqueLabel.AppendInt((int)it->second.lineno);
-									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.z, 0.01, 0.1, 6)) {
+									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.z, 0.01f, 0.1f, "%.6f")) {
 										bSetVec4 = true;
 									}
 									ImGui::Indent(-20);
@@ -3019,25 +3304,25 @@ void ProcessCodeProperties(void)
 									uniqueLabel = " X"; //var;
 									uniqueLabel.Append("##IDEGUIinput");
 									uniqueLabel.AppendInt((int)it->second.lineno);
-									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.x, 0.01, 0.1, 6)) {
+									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.x, 0.01f, 0.1f, "%.6f")) {
 										bSetVec4 = true;
 									}
 									uniqueLabel = " Y"; //var;
 									uniqueLabel.Append("##IDEGUIinput");
 									uniqueLabel.AppendInt((int)it->second.lineno);
-									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.y, 0.01, 0.1, 6)) {
+									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.y, 0.01f, 0.1f, "%.6f")) {
 										bSetVec4 = true;
 									}
 									uniqueLabel = " Z"; //var;
 									uniqueLabel.Append("##IDEGUIinput");
 									uniqueLabel.AppendInt((int)it->second.lineno);
-									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.z, 0.01, 0.1, 6)) {
+									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.z, 0.01f, 0.1f, "%.6f")) {
 										bSetVec4 = true;
 									}
 									uniqueLabel = " W"; //var;
 									uniqueLabel.Append("##IDEGUIinput");
 									uniqueLabel.AppendInt((int)it->second.lineno);
-									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.w, 0.01, 0.1, 6)) {
+									if (ImGui::InputFloat(uniqueLabel, (float*)&tmpvec4.w, 0.01f, 0.1f, "%.6f")) {
 										bSetVec4 = true;
 									}
 									ImGui::Indent(-20);
@@ -3208,9 +3493,9 @@ void ProcessIOSExport(void)
 	int input_indent = 12 * ImGui::GetFontSize();
 	int item_dot_width = -37;
 	ImGuiWindowFlags window_flags = 0;
-	ImGui::SetNextWindowSize(ImVec2(67*ImGui::GetFontSize(), 40 *ImGui::GetFontSize()), ImGuiCond_Once);
-	ImGui::SetNextWindowPosCenter(ImGuiCond_Once);;
-	ImGui::Begin("IPA export.", &show_iosexport_window, window_flags);
+	ImGui::SetNextWindowSize(ImVec2(67*ImGui::GetFontSize(), 40 *ImGui::GetFontSize()), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+	ImGui::Begin("IPA export", &show_iosexport_window, window_flags);
 	if (show_iosexport_window_state != show_iosexport_window) {
 		show_iosexport_window_state = show_iosexport_window;
 		ImGui::SetKeyboardFocusHere();
@@ -3534,9 +3819,9 @@ void ProcessIOSExport(void)
 
 	ImGui::NextColumn();
 
-	ImGui::Indent(-10.0);
+	ImGui::Indent(-8.0);
 	ImGui::Text("Output:");
-	ImGui::Indent(10.0);
+	ImGui::Indent(8.0);
 
 	ImGui::Text("Output File Location:");
 	ImGui::SameLine();
@@ -6502,13 +6787,14 @@ void ProcessAndroidExport(void)
 		static int TextFiltersVERSION(ImGuiInputTextCallbackData* data) { if (data->EventChar < 256 && strchr("0123456789.", (char)data->EventChar)) return 0; return 1; }
 	};
 	//*ImGui::GetFontSize()
-	int input_indent = 12*ImGui::GetFontSize();
+	// Increase global spacing between labels and controls in Android export modal
+	float input_indent = 13.0f * ImGui::GetFontSize();
 	int item_dot_width = -32;
 	ImGuiWindowFlags window_flags = 0;
-	//ImGui::SetNextWindowSize(ImVec2(67 * ImGui::GetFontSize(), 44 * ImGui::GetFontSize()), ImGuiCond_Once);
-	ImGui::SetNextWindowSize(ImVec2(70 * ImGui::GetFontSize(), 46 * ImGui::GetFontSize()), ImGuiCond_Once);
-	ImGui::SetNextWindowPosCenter(ImGuiCond_Once);
-	ImGui::Begin("Android export.", &show_androidexport_window, window_flags);
+	//ImGui::SetNextWindowSize(ImVec2(67 * ImGui::GetFontSize(), 44 * ImGui::GetFontSize()), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(70 * ImGui::GetFontSize(), 46 * ImGui::GetFontSize()), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+	ImGui::Begin("Android Export", &show_androidexport_window, window_flags);
 	if (show_androidexport_window_state != show_androidexport_window) {
 		show_androidexport_window_state = show_androidexport_window;
 		ImGui::SetKeyboardFocusHere();
@@ -6527,15 +6813,15 @@ void ProcessAndroidExport(void)
 	ImGui::SetWindowFontScale(1.0);
 
 	ImGui::Indent(10.0);
-	ImGui::TextWrapped("This will build an APK from your media and bytecode that will run on any Android device running 4.1 or above. It can also be used to produce an APK suitable for the Google Play, Amazon, or Ouya store if you also provide a keystore file for signing. If you don't yet have a keystore file you can generate one from the Tools menu or in Android Studio.");
-
+	ImGui::TextWrapped("This will build an APK from your media and bytecode that will run on any Android device running 5.0 or above. It can also be used to produce an APK suitable for the Google Play, Amazon, or Ouya store if you also provide a keystore file for signing. If you don't yet have a keystore file you can generate one from the Tools menu or in Android Studio.");
+	ImGui::Text("");
 
 	ImGui::Columns(2, "myAPKexportDialog", false);  // 3-ways, no border
 
 
-	ImGui::Indent(-10.0);
+	ImGui::Indent(-8.0);
 	ImGui::Text("APK Settings:");
-	ImGui::Indent(10.0);
+	ImGui::Indent(8.0);
 
 	ImGui::Text("APK Type:");
 	const char* apk_type[ 10 ];
@@ -6688,15 +6974,15 @@ void ProcessAndroidExport(void)
 
 
 	ImGui::Text("Minimum Android Version:");
-	const char* apk_version_array[] = { "4.1 (API 16)", "4.2 (API 17)", "4.3 (API 18)", "4.4 (API 19)", "5.0 (API 21)", "5.1 (API 22)", "6.0 (API 23)"
-		, "7.0 (API 24)", "7.1 (API 25)", "8.0 (API 26)", "8.1 (API 27)", "9.0 (API 28)", "10.0 (API 29)", "11.0 (API 30)", "12.0 (API 31)", "13.0 (API 33)", "14.0 (API 34)" };
+	const char* apk_version_array[] = { "5.0 (API 21)", "5.1 (API 22)", "6.0 (API 23)"
+		, "7.0 (API 24)", "7.1 (API 25)", "8.0 (API 26)", "8.1 (API 27)", "9.0 (API 28)", "10.0 (API 29)", "11.0 (API 30)", "12.0 (API 31)", "13.0 (API 33)", "14.0 (API 34)", "15.0 (API 35)" };
 	ImGui::SameLine();
 	ImGui::SetCursorPos(ImVec2(input_indent, ImGui::GetCursorPos().y));
 	ImGui::Combo("##comboapk_sdk_version", &pCurrentSelectedProject->apk_sdk_version, apk_version_array, IM_ARRAYSIZE(apk_version_array));
 	if (ImGui::IsItemHovered()) {
 		ImGui::SetNextWindowContentSize(ImVec2(400, 0));
 		ImGui::BeginTooltip();
-		ImGui::TextWrapped("For maximum compatibility choose 4.1, if ARCore is required then this must be at least 7.0");
+		ImGui::TextWrapped("For maximum compatibility choose 5.0, if ARCore is required then this must be at least 7.0");
 		ImGui::EndTooltip();
 	}
 
@@ -6720,9 +7006,9 @@ void ProcessAndroidExport(void)
 	}
 
 
-	ImGui::Indent(-10.0);
+	ImGui::Indent(-8.0);
 	ImGui::Text("Permissions:");
-	ImGui::Indent(10.0);
+	ImGui::Indent(8.0);
 
 
 #define AGK_ANDROID_PERMISSION_WRITE                0x001
@@ -6878,15 +7164,11 @@ void ProcessAndroidExport(void)
 	ImGui::Columns(1);
 	ImGui::EndChild();
 
-
-
-
 	ImGui::NextColumn();
 
-
-	ImGui::Indent(-10.0);
+	ImGui::Indent(-8.0);
 	ImGui::Text("Additional Settings (optional):");
-	ImGui::Indent(10.0);
+	ImGui::Indent(8.0);
 
 	ImGui::Text("AdMob App ID:");
 	float startline = ImGui::GetCursorPos().x;
@@ -6972,9 +7254,9 @@ void ProcessAndroidExport(void)
 	}
 	
 
-	ImGui::Indent(-10.0);
+	ImGui::Indent(-8.0);
 	ImGui::Text("Signing (optional):");
-	ImGui::Indent(10.0);
+	ImGui::Indent(8.0);
 	ImGui::TextWrapped("The following must be filled out if you want an APK suitable for submitting to the Google Play, Amazon, or Ouya store. If you are submitting a Bundle to Google Play then this must be the Upload Key");
 
 	ImGui::Text("Keystore File:");
@@ -7027,9 +7309,11 @@ void ProcessAndroidExport(void)
 		ImGui::EndTooltip();
 	}
 
-
+	ImGui::Indent(-8.0);
 	ImGui::Text("Advanced:");
+	ImGui::Indent(8.0);
 	ImGui::TextWrapped("If you are providing a keystore generated by Android Studio please enter the alias name and password used to access it.");
+	
 
 	ImGui::Text("Alias:");
 	ImGui::SameLine();
@@ -7051,9 +7335,9 @@ void ProcessAndroidExport(void)
 
 	ImGui::NextColumn();
 
-	ImGui::Indent(-10.0);
+	ImGui::Indent(-8.0);
 	ImGui::Text("Output:");
-	ImGui::Indent(10.0);
+	ImGui::Indent(8.0);
 	
 
 	ImGui::Text("Output File Location:");
@@ -7082,7 +7366,8 @@ void ProcessAndroidExport(void)
 //		if (ImGui::Button("Copy Error Text To Clipboard")) {
 //			ImGui::SetClipboardText(android_error);
 //		}
-		ImGui::TextWrapped("Error: %s", android_error);
+		BoxerInfo(android_error, "Export Error");
+		strcpy(android_error, ""); // Clear the error after showing popup
 	}
 
 	ImGui::NextColumn();
@@ -7119,24 +7404,22 @@ void ProcessAndroidExport(void)
 		char szOrientation[20];
 		sprintf(szOrientation, "%d", orientation);
 
-		int sdk = 16;
-		if (pCurrentSelectedProject->apk_sdk_version == 0) sdk = 16;
-		if (pCurrentSelectedProject->apk_sdk_version == 1) sdk = 17;
-		if (pCurrentSelectedProject->apk_sdk_version == 2) sdk = 18;
-		if (pCurrentSelectedProject->apk_sdk_version == 3) sdk = 19;
-		if (pCurrentSelectedProject->apk_sdk_version == 4) sdk = 21; // 20 deliberately missing
-		if (pCurrentSelectedProject->apk_sdk_version == 5) sdk = 22;
-		if (pCurrentSelectedProject->apk_sdk_version == 6) sdk = 23;
-		if (pCurrentSelectedProject->apk_sdk_version == 7) sdk = 24;
-		if (pCurrentSelectedProject->apk_sdk_version == 8) sdk = 25;
-		if (pCurrentSelectedProject->apk_sdk_version == 9) sdk = 26;
-		if (pCurrentSelectedProject->apk_sdk_version == 10) sdk = 27;
-		if (pCurrentSelectedProject->apk_sdk_version == 11) sdk = 28;
-		if (pCurrentSelectedProject->apk_sdk_version == 12) sdk = 29;
-		if (pCurrentSelectedProject->apk_sdk_version == 13) sdk = 30;
-		if (pCurrentSelectedProject->apk_sdk_version == 14) sdk = 31;
-		if (pCurrentSelectedProject->apk_sdk_version == 15) sdk = 33; // 32 deliberately missing
-		if (pCurrentSelectedProject->apk_sdk_version == 16) sdk = 34;
+		int sdk = 21;
+		if (pCurrentSelectedProject->apk_sdk_version == 0) sdk = 21;
+		if (pCurrentSelectedProject->apk_sdk_version == 1) sdk = 22;
+		if (pCurrentSelectedProject->apk_sdk_version == 2) sdk = 23;
+		if (pCurrentSelectedProject->apk_sdk_version == 3) sdk = 24;
+		if (pCurrentSelectedProject->apk_sdk_version == 4) sdk = 25;
+		if (pCurrentSelectedProject->apk_sdk_version == 5) sdk = 26;
+		if (pCurrentSelectedProject->apk_sdk_version == 6) sdk = 27;
+		if (pCurrentSelectedProject->apk_sdk_version == 7) sdk = 28;
+		if (pCurrentSelectedProject->apk_sdk_version == 8) sdk = 29;
+		if (pCurrentSelectedProject->apk_sdk_version == 9) sdk = 30;
+		if (pCurrentSelectedProject->apk_sdk_version == 10) sdk = 31;
+		if (pCurrentSelectedProject->apk_sdk_version == 11) sdk = 33; // 32 deliberately missing
+		if (pCurrentSelectedProject->apk_sdk_version == 12) sdk = 34;
+		if (pCurrentSelectedProject->apk_sdk_version == 13) sdk = 35;
+
 		char szSDK[20];
 		sprintf(szSDK, "%d", sdk);
 
@@ -7362,8 +7645,7 @@ void ProcessAndroidExport(void)
 		if (Valid) {
 			char curDir[MAX_PATH];
 			extern char startupFolder[MAX_PATH];
-			//const char* androidJar = "android33.jar";
-			const char* androidJar = "android34.jar";
+			const char* androidJar = "android35.jar";
 
 #if defined(AGK_WINDOWS)
 			_getcwd(&curDir[0], MAX_PATH);
@@ -7746,9 +8028,8 @@ void ProcessAndroidExport(void)
 					strcat(newcontents, szSDK);
 					
 					strcat(newcontents, "\" android:targetSdkVersion=\"");
-					if ( bIsOuya ) strcat(newcontents, "16");
-					//else strcat ( newcontents, "33" );
-					else strcat(newcontents, "34");
+					if ( bIsOuya ) strcat(newcontents, "21");
+					else strcat(newcontents, "35");
 					strcat(newcontents, "\" />\n\n");
 
 
@@ -7981,7 +8262,7 @@ void ProcessAndroidExport(void)
 						strcat(newcontents, "\n\
 						<meta-data\n\
 							android:name=\"com.google.android.play.billingclient.version\"\n\
-							android:value=\"5.0.0\" />\n\
+							android:value=\"7.1.1\" />\n\
 						<activity\n\
 							android:name=\"com.android.billingclient.api.ProxyBillingActivity\"\n\
 							android:configChanges=\"keyboard|keyboardHidden|screenLayout|screenSize|orientation\"\n\
@@ -9856,8 +10137,22 @@ void ProcessAndroidExport(void)
 		}
 
 		PleaseWaitEnd();
-		if (Valid)
+		if (Valid) {
+			// Clear any previous error messages
+			strcpy(android_error, "");
+			
+			// Extract filename from output path for success message
+			char *filename = strrchr(output_file, '\\');
+			if (!filename) filename = strrchr(output_file, '/');
+			if (!filename) filename = output_file;
+			else filename++; // Skip the path separator
+			
+			char success_msg[1024];
+			sprintf(success_msg, "%s has been exported successfully", filename);
+			BoxerInfo(success_msg, "Success");
+			
 			show_androidexport_window = false;
+		}
 	  }
 	}
 
@@ -10189,9 +10484,9 @@ void ProcessHTML5Export(void)
 	int input_indent = 12 * ImGui::GetFontSize();
 	int item_dot_width = -32;
 	ImGuiWindowFlags window_flags = 0;
-	ImGui::SetNextWindowSize(ImVec2(40 * ImGui::GetFontSize(), 29 * ImGui::GetFontSize()), ImGuiCond_Once);
-	ImGui::SetNextWindowPosCenter(ImGuiCond_Once);
-	ImGui::Begin("HTML5 export.", &show_html5export_window, window_flags);
+	ImGui::SetNextWindowSize(ImVec2(40 * ImGui::GetFontSize(), 29 * ImGui::GetFontSize()), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+	ImGui::Begin("HTML5 Export", &show_html5export_window, window_flags);
 
 	ImGui::Indent(8.0f);
 	ImGui::Spacing();
@@ -10247,6 +10542,30 @@ void ProcessHTML5Export(void)
 		ImGui::EndTooltip();
 	}
 	pCurrentSelectedProject->html_dynamic_memory = bDynamic;
+
+	// Hide AGKS branding option (persisted in preferences)
+	ImGui::Text("Hide AGKS Branding:");
+	ImGui::SameLine();
+	ImGui::SetCursorPos(ImVec2(input_indent, ImGui::GetCursorPos().y));
+	ImGui::Checkbox("##html5HideBranding", &pref.bHideAGKSBranding);
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetNextWindowContentSize(ImVec2(400, 0));
+		ImGui::BeginTooltip();
+		ImGui::TextWrapped("When checked, removes the AppGameKit logo and website link from AGKPlayer.html.");
+		ImGui::EndTooltip();
+	}
+
+	// Open output folder option (persisted in preferences)
+	ImGui::Text("Open Output Folder:");
+	ImGui::SameLine();
+	ImGui::SetCursorPos(ImVec2(input_indent, ImGui::GetCursorPos().y));
+	ImGui::Checkbox("##html5OpenOutputFolder", &pref.bOpenHTML5OutputFolder);
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetNextWindowContentSize(ImVec2(400, 0));
+		ImGui::BeginTooltip();
+		ImGui::TextWrapped("When checked, opens the output folder after a successful export.");
+		ImGui::EndTooltip();
+	}
 
 
 	ImGui::Text("Output Folder:");
@@ -10496,6 +10815,69 @@ void ProcessHTML5Export(void)
 				Valid = false;
 			}
 		}
+
+		// If requested, update AGKPlayer.html to hide branding (logo and website link)
+		if (Valid && pref.bHideAGKSBranding)
+		{
+			uString agkhtml_file = tmp_folder;
+			agkhtml_file.Append("/AGKPlayer.html");
+
+			char *html_contents = NULL;
+			int html_length = 0;
+			if (!(html_contents = g_file_get_contents((char*)agkhtml_file.GetStr(), html_contents, &html_length, NULL)))
+			{
+				BoxerInfo("Failed to read AGKPlayer.html file:", "Export Error");
+				Valid = false;
+			}
+			else
+			{
+				// Prepare new contents with injected CSS to hide branding
+				const char *inject_css = "\n<!-- Injected by Export: hide AGK branding -->\n<style>\nimg[src*=\"agks-logo-white.svg\"], a[href*=\"appgamekit\"], a[href*=\"thegamecreators\"], .agk-brand, #agk-brand { display: none !important; }\n</style>\n";
+				char *html_new = new char[html_length + 2048];
+				if (html_new)
+				{
+					strcpy(html_new, "");
+					char *insertPos = strstr(html_contents, "</head>");
+					if (!insertPos) insertPos = strstr(html_contents, "</HEAD>");
+					if (insertPos)
+					{
+						// Split at </head> and inject before it
+						*insertPos = 0;
+						strcat(html_new, html_contents);
+						strcat(html_new, inject_css);
+						strcat(html_new, "</head>");
+						insertPos += strlen("</head>");
+						strcat(html_new, insertPos);
+					}
+					else
+					{
+						// No </head> found, prepend CSS
+						strcat(html_new, inject_css);
+						strcat(html_new, html_contents);
+					}
+
+					if (file_exists((char*)agkhtml_file.GetStr())) {
+						remove(agkhtml_file.GetStr());
+					}
+					FILE *htmlFile = fopen(agkhtml_file.GetStr(), "wb+");
+					if (!htmlFile) htmlFile = AGKfopen(agkhtml_file.GetStr(), "wb+");
+					if (htmlFile)
+					{
+						fwrite(html_new, 1, strlen(html_new), htmlFile);
+						fclose(htmlFile);
+					}
+					else
+					{
+						BoxerInfo("Failed to write AGKPlayer.html file:", "Export Error");
+						Valid = false;
+					}
+
+					delete [] html_new;
+				}
+
+				if (html_contents) free(html_contents);
+			}
+		}
 		if (Valid) {
 			// reuse variables
 			//if (html5data_file) g_free(html5data_file);
@@ -10557,9 +10939,14 @@ void ProcessHTML5Export(void)
 			agkplayer_file = output_file; agkplayer_file.Append("/AGKPlayer.html.mem");
 			cp_copyfile((char *)html5data_file.GetStr(), (char *)agkplayer_file.GetStr());
 
+
+			// Conditionally include branding asset
 			html5data_file = tmp_folder; html5data_file.Append("/agks-logo-white.svg");
 			agkplayer_file = output_file; agkplayer_file.Append("/agks-logo-white.svg");
-			cp_copyfile((char *)html5data_file.GetStr(), (char *)agkplayer_file.GetStr());
+			if (!pref.bHideAGKSBranding)
+			{
+				cp_copyfile((char *)html5data_file.GetStr(), (char *)agkplayer_file.GetStr());
+			}
 
 			html5data_file = tmp_folder; html5data_file.Append("/dots.png");
 			agkplayer_file = output_file; agkplayer_file.Append("/dots.png");
@@ -10611,6 +10998,25 @@ void ProcessHTML5Export(void)
 		utils_remove_folder_recursive(tmp_folder.GetStr());
 
 		if (Valid) {
+			// Open output folder if preference is set
+			if (pref.bOpenHTML5OutputFolder) {
+			
+#ifdef AGK_WINDOWS
+
+			//agk::RunApp("explorer", output_folder);
+			{
+				uString tmp = output_folder;
+				// Convert forward slashes to backslashes for explorer on Windows
+				tmp.ReplaceStr("/", "\\");
+				agk::RunApp("explorer", tmp);
+			}
+
+#elif defined(AGK_MACOS)
+				agk::OpenBrowser(output_folder);
+#else
+				agk::OpenBrowser(output_folder);
+#endif
+			}
 			show_html5export_window = false;
 		}
 	}
@@ -11308,9 +11714,9 @@ void ProcessAdditionalFiles(void)
 
 	int input_indent = 13 * ImGui::GetFontSize();;
 	ImGuiWindowFlags window_flags = 0;
-	ImGui::SetNextWindowSize(ImVec2(38 * ImGui::GetFontSize(), 27 * ImGui::GetFontSize()), ImGuiCond_Once);
-	ImGui::SetNextWindowPosCenter(ImGuiCond_Once);;
-	ImGui::Begin("Additional Files.", &show_additionalfiles_window, window_flags);
+	ImGui::SetNextWindowSize(ImVec2(38 * ImGui::GetFontSize(), 27 * ImGui::GetFontSize()),ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+	ImGui::Begin("Additional Files", &show_additionalfiles_window, window_flags);
 
 	//if (show_keystore_window_state != show_keystore_window) {
 	//	show_keystore_window_state = show_keystore_window;
@@ -11474,7 +11880,7 @@ void StartInstallProcess( void )
 		ImGui::OpenPopup("Installing Please Wait.");
 
 		ImGui::SetNextWindowSize(ImVec2(34 * ImGui::GetFontSize(), 13 * ImGui::GetFontSize()), ImGuiCond_Always);
-		ImGui::SetNextWindowPosCenter(ImGuiCond_Always);
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
 		bool openinstall = true;
 		if (ImGui::BeginPopupModal("Installing Please Wait.", &openinstall, 0)) //ImGuiWindowFlags_AlwaysAutoResize
@@ -11558,9 +11964,9 @@ void ProcessKeyStore(void)
 
 	int input_indent = 13 * ImGui::GetFontSize();;
 	ImGuiWindowFlags window_flags = 0;
-	ImGui::SetNextWindowSize(ImVec2(42 * ImGui::GetFontSize(), 39 * ImGui::GetFontSize()), ImGuiCond_Once);
-	ImGui::SetNextWindowPosCenter(ImGuiCond_Once);;
-	ImGui::Begin("Generate Keystore File.", &show_keystore_window, window_flags);
+	ImGui::SetNextWindowSize(ImVec2(42 * ImGui::GetFontSize(), 39 * ImGui::GetFontSize()), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+	ImGui::Begin("Generate Keystore File", &show_keystore_window, window_flags);
 	if (show_keystore_window_state != show_keystore_window) {
 		show_keystore_window_state = show_keystore_window;
 		ImGui::SetKeyboardFocusHere();
@@ -11848,7 +12254,7 @@ void ProcessGotoLine(void)
 
 	ImGuiWindowFlags window_flags = 0;
 	ImGui::SetNextWindowSize(ImVec2(26 * ImGui::GetFontSize(), 4 * ImGui::GetFontSize()), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowPosCenter(ImGuiCond_Once);;
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
 	ImGui::Begin("Goto Line Number", &show_gotoline_window, window_flags);
 	if (show_gotoline_window_state != show_gotoline_window) {
 		show_gotoline_window_state = show_gotoline_window;
@@ -11886,7 +12292,7 @@ void ProcessInfoBox(void)
 	//ImGui::SetNextWindowPosCenter(ImGuiCond_Once);;
 
 	ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos( ImVec2( viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.35f), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
+	ImGui::SetNextWindowPos( ImVec2( viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.35f), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
 	ImGui::SetNextWindowViewport(viewport->ID);
 
 
@@ -11909,6 +12315,7 @@ void ProcessInfoBox(void)
 bool show_aboutbox_window = false;
 char *eula = NULL;
 char *eula2 = NULL;
+char *buildinfo = NULL;
 
 void ProcessAboutBox(void)
 {
@@ -11920,12 +12327,17 @@ void ProcessAboutBox(void)
 		eula = read_eula();
 	}
 
+	if (!buildinfo) {
+		//Read file.
+		buildinfo = read_buildinfo();
+	}
+
 	ImGuiWindowFlags window_flags = 0;
 	ImGui::SetNextWindowSize(ImVec2(28 * ImGui::GetFontSize(), 25 * ImGui::GetFontSize()), ImGuiCond_FirstUseEver);
 	//ImGui::SetNextWindowPosCenter(ImGuiCond_Once);;
 
 	ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.35f), ImGuiCond_Once, ImVec2(0.5f, 0.5f));
+	ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.35f), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
 	ImGui::SetNextWindowViewport(viewport->ID);
 
 	ImGui::Begin("About", &show_aboutbox_window, window_flags);
@@ -11988,6 +12400,9 @@ void ProcessAboutBox(void)
 			ImGui::Text("Preben Eriksen - Developer");
 
 			ImGui::SetCursorPos(ImVec2((ws.x*0.5) - (tw.x*0.5), ImGui::GetCursorPosY()));
+			ImGui::Text("David Walker - Developer");
+
+			ImGui::SetCursorPos(ImVec2((ws.x*0.5) - (tw.x*0.5), ImGui::GetCursorPosY()));
 			ImGui::Text("Rick Vanner - Producer");
 
 			ImGui::SetCursorPos(ImVec2((ws.x*0.5) - (tw.x*0.5), ImGui::GetCursorPosY()));
@@ -12015,7 +12430,8 @@ void ProcessAboutBox(void)
 			ImGui::Text("Community Dev Team:");
 			
 			ImGui::SetCursorPos(ImVec2((ws.x * 0.5) - (tw.x * 0.5), ImGui::GetCursorPosY()));
-			ImGui::Text("David Walker - Developer");
+			ImGui::Text("White3 - Documentation & Testing");
+
 
 			ImGui::NewLine();
 			ImGui::EndTabItem();
@@ -12028,6 +12444,15 @@ void ProcessAboutBox(void)
 			ImGui::TextUnformatted(eula);
 			ImGui::PopTextWrapPos();
 			//ImGui::TextWrapped(eula);
+			ImGui::NewLine();
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem(" Build Info "))
+		{
+			ImGui::PushTextWrapPos(0.0f);
+			ImGui::TextUnformatted(buildinfo);
+			ImGui::PopTextWrapPos();
 			ImGui::NewLine();
 			ImGui::EndTabItem();
 		}
@@ -12322,7 +12747,8 @@ namespace ImGui {
 bool BeginPopupContextItemAGK(const char* str_id, int mouse_button)
 {
 	ImGuiWindow* window = GImGui->CurrentWindow;
-	ImGuiID id = str_id ? window->GetID(str_id) : window->DC.LastItemId; // If user hasn't passed an ID, we can use the LastItemID. Using LastItemID as a Popup ID won't conflict!
+	ImGuiContext& g = *GImGui;
+	ImGuiID id = str_id ? window->GetID(str_id) : g.LastItemData.ID; // If user hasn't passed an ID, we can use the LastItemID. Using LastItemID as a Popup ID won't conflict!
 	IM_ASSERT(id != 0);                                                  // You cannot pass a NULL str_id if the last item has no identifier (e.g. a Text() item)
 	if (IsMouseReleased(mouse_button) && IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup))
 		OpenPopupEx(id);
@@ -12341,7 +12767,7 @@ int windowTabFlags(void)
 {
 	//DockTabItemStatusFlags
 	ImGuiWindow* window = GetCurrentWindow();
-	return (int) window->DockTabItemStatusFlags;
+	return (int) window->DC.DockTabItemStatusFlags;
 }
 int windowDockNodeId(void)
 {
@@ -12804,6 +13230,16 @@ void AddAllFonts(const char *cpcustomfont,int iIDEFontSize, const char *cpeditor
 		agkfont = customfont;
 	}
 
+	// Sync ImGui base font size with the newly loaded font to avoid blurry scaling.
+	// In 1.92+, the current font size is decoupled; ensure the shared base matches the baked size.
+	{
+		ImGuiStyle& style = ImGui::GetStyle();
+		float baked_size = customfont ? customfont->LegacySize : (io.Fonts->Fonts.empty() ? style.FontSizeBase : io.Fonts->Fonts[0]->LegacySize);
+		style.FontSizeBase = baked_size;
+		// Schedule the change to apply next frame (per upstream demo guidance).
+		style._NextFrameFontSizeBase = style.FontSizeBase;
+	}
+
 	//Add AGK default font.
 	//"NotoSans-Regular.ttf"
 
@@ -13010,7 +13446,7 @@ void SetSeedStyleColors()
 	style.Colors[ImGuiCol_Text] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
 	style.Colors[ImGuiCol_TextDisabled] = ImVec4(col_text.x, col_text.y, col_text.z, 0.58f);
 	style.Colors[ImGuiCol_WindowBg] = ImVec4(col_back.x, col_back.y, col_back.z, 1.00f);
-	style.Colors[ImGuiCol_ChildWindowBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.00f);
+	style.Colors[ImGuiCol_ChildBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.00f);
 	style.Colors[ImGuiCol_Border] = ImVec4(col_text.x, col_text.y, col_text.z, 0.30f);
 	style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
 	style.Colors[ImGuiCol_FrameBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
@@ -13040,9 +13476,9 @@ void SetSeedStyleColors()
 //	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.96f);
 
 	style.Colors[ImGuiCol_HeaderActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	style.Colors[ImGuiCol_Column] = ImVec4(col_text.x, col_text.y, col_text.z, 0.32f);
-	style.Colors[ImGuiCol_ColumnHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.78f);
-	style.Colors[ImGuiCol_ColumnActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
+	style.Colors[ImGuiCol_Separator] = ImVec4(col_text.x, col_text.y, col_text.z, 0.32f);
+	style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.78f);
+	style.Colors[ImGuiCol_SeparatorActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
 	style.Colors[ImGuiCol_ResizeGrip] = ImVec4(col_main.x, col_main.y, col_main.z, 0.20f);
 	style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.78f);
 	style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
@@ -13061,9 +13497,7 @@ void SetSeedStyleColors()
 	//style.Colors[ImGuiCol_TooltipBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.92f);
 	style.Colors[ImGuiCol_PopupBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.92f);
 
-	style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
-
-
+	//style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
 	style.Colors[ImGuiCol_Tab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.66f);
 	style.Colors[ImGuiCol_TabHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.86f);
 	style.Colors[ImGuiCol_TabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.0f);
@@ -13076,7 +13510,7 @@ void SetSeedStyleColors()
 	style.Colors[ImGuiCol_NavHighlight] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
 	style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 1.0f);
 	style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
-	style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.6f);
+	style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.0f);
 }
 
 
@@ -13129,63 +13563,7 @@ void myLightStyle(ImGuiStyle* dst)
 
 	Colors[ImGuiCol_PlotHistogram] = ImVec4(0.40f, 0.20f, 0.00f, 1.00f); //Also <h1> tags in help.
 }
-/*
-void myStyle(ImGuiStyle* dst)
-{
-	ImGuiStyle* style = dst ? dst : &ImGui::GetStyle();
-	ImVec4* Colors = style->Colors;
 
-	Colors[ImGuiCol_Text] = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
-	Colors[ImGuiCol_TextDisabled] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
-	//Colors[ImGuiCol_TextHovered] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
-	//Colors[ImGuiCol_TextActive] = ImVec4(1.00f, 1.00f, 0.00f, 1.00f);
-	Colors[ImGuiCol_WindowBg] = ImVec4(0.94f, 0.94f, 0.94f, 1.00f);
-	Colors[ImGuiCol_ChildWindowBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-	Colors[ImGuiCol_Border] = ImVec4(0.00f, 0.00f, 0.00f, 0.39f);
-	Colors[ImGuiCol_BorderShadow] = ImVec4(1.00f, 1.00f, 1.00f, 0.10f);
-	Colors[ImGuiCol_FrameBg] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
-	Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.40f);
-	Colors[ImGuiCol_FrameBgActive] = ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
-	Colors[ImGuiCol_TitleBg] = ImVec4(0.96f, 0.96f, 0.96f, 1.00f);
-	Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(1.00f, 1.00f, 1.00f, 0.51f);
-	Colors[ImGuiCol_TitleBgActive] = ImVec4(0.82f, 0.82f, 0.82f, 1.00f);
-	Colors[ImGuiCol_MenuBarBg] = ImVec4(0.86f, 0.86f, 0.86f, 1.00f);
-	Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.98f, 0.98f, 0.98f, 0.53f);
-	Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.69f, 0.69f, 0.69f, 0.80f);
-	Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.49f, 0.49f, 0.49f, 0.80f);
-	Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.49f, 0.49f, 0.49f, 1.00f);
-	//Colors[ImGuiCol_ComboBg] = ImVec4(0.86f, 0.86f, 0.86f, 0.99f);
-	Colors[ImGuiCol_CheckMark] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	Colors[ImGuiCol_SliderGrab] = ImVec4(0.26f, 0.59f, 0.98f, 0.78f);
-	Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	Colors[ImGuiCol_Button] = ImVec4(0.26f, 0.59f, 0.98f, 0.40f);
-	Colors[ImGuiCol_ButtonHovered] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	Colors[ImGuiCol_ButtonActive] = ImVec4(0.06f, 0.53f, 0.98f, 1.00f);
-	Colors[ImGuiCol_Header] = ImVec4(0.26f, 0.59f, 0.98f, 0.31f);
-	Colors[ImGuiCol_HeaderHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
-	Colors[ImGuiCol_HeaderActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	Colors[ImGuiCol_Column] = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
-	Colors[ImGuiCol_ColumnHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.78f);
-	Colors[ImGuiCol_ColumnActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	Colors[ImGuiCol_ResizeGrip] = ImVec4(1.00f, 1.00f, 1.00f, 0.00f);
-	Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
-	Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
-	//Colors[ImGuiCol_CloseButton] = ImVec4(0.59f, 0.59f, 0.59f, 0.50f);
-	//Colors[ImGuiCol_CloseButtonHovered] = ImVec4(0.98f, 0.39f, 0.36f, 1.00f);
-	//Colors[ImGuiCol_CloseButtonActive] = ImVec4(0.98f, 0.39f, 0.36f, 1.00f);
-	Colors[ImGuiCol_PlotLines] = ImVec4(0.39f, 0.39f, 0.39f, 1.00f);
-	Colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
-	Colors[ImGuiCol_PlotHistogram] = ImVec4(0.90f, 0.70f, 0.00f, 1.00f); //Also <h1> tags in help.
-	Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
-	Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.26f, 0.59f, 0.98f, 0.35f);
-	//Colors[ImGuiCol_TooltipBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.94f);
-	Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
-
-	style->Colors[ImGuiCol_DragDropTarget] = ImVec4(0.58f, 0.58f, 0.58f, 0.90f);
-
-}
-
-*/
 void myDefaultStyle(ImGuiStyle* dst)
 {
 	auto *style = (dst ? dst : &ImGui::GetStyle());
@@ -13256,7 +13634,7 @@ void myDefaultStyle(ImGuiStyle* dst)
 	style->Colors[ImGuiCol_NavHighlight] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
 	style->Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 1.0f);
 	style->Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
-	style->Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.6f);
+	style->Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.0f);
 	style->Colors[ImGuiCol_DragDropTarget] = ImVec4(0.58f, 0.58f, 0.58f, 0.90f);
 
 }
@@ -13265,21 +13643,25 @@ void myDefaultStyle(ImGuiStyle* dst)
 void myDarkGreyStyle(ImGuiStyle* dst)
 {
 	ImGuiStyle &st = ImGui::GetStyle();
-	st.FrameBorderSize = 1.0f;
-	st.FramePadding = ImVec2(4.0f, 2.0f);
-	st.ItemSpacing = ImVec2(8.0f, 2.0f);
 	st.WindowBorderSize = 2.0f;
-	//	st.TabBorderSize = 1.0f;
-	st.WindowRounding = 1.0f;
-	st.ChildRounding = 1.0f;
-	st.FrameRounding = 1.0f;
-	st.ScrollbarRounding = 1.0f;
+	st.WindowPadding = { 4.0f,4.0f };
 	st.ScrollbarSize = 18.0;
-	st.GrabRounding = 1.0f;
-	//	st.TabRounding = 1.0f;
 
-//	st.TabBorderSize = 5.0f;
-//	st.TabRounding = 2.0f;
+	// st.FrameBorderSize = 1.0f;
+	// st.FramePadding = ImVec2(4.0f, 2.0f);
+	// st.ItemSpacing = ImVec2(8.0f, 2.0f);
+	// st.WindowBorderSize = 2.0f;
+	// st.TabBorderSize = 1.0f;
+	// st.WindowRounding = 1.0f;
+	// st.ChildRounding = 1.0f;
+	// st.FrameRounding = 1.0f;
+	// st.ScrollbarRounding = 1.0f;
+	// st.ScrollbarSize = 18.0;
+	// st.GrabRounding = 1.0f;
+	// st.TabRounding = 1.0f;
+
+	//	st.TabBorderSize = 5.0f;
+	//	st.TabRounding = 2.0f;
 
 
 	// Setup style
@@ -13287,7 +13669,7 @@ void myDarkGreyStyle(ImGuiStyle* dst)
 	colors[ImGuiCol_Text] = ImVec4(1.00f, 1.00f, 1.00f, 0.95f);
 	colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
 	colors[ImGuiCol_WindowBg] = ImVec4(0.13f, 0.12f, 0.12f, 0.941f);
-	colors[ImGuiCol_ChildBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.031f);
+	colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f); //child backgrounnd transparent
 	colors[ImGuiCol_PopupBg] = ImVec4(0.05f, 0.05f, 0.05f, 0.94f);
 	colors[ImGuiCol_Border] = ImVec4(0.53f, 0.53f, 0.53f, 0.25f);
 	colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
@@ -13335,32 +13717,129 @@ void myDarkGreyStyle(ImGuiStyle* dst)
 	colors[ImGuiCol_NavHighlight] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
 	colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
 	colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
-	colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
+	colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.0f);
 }
 
-void HueStyle(ImGuiStyle* dst)
+void myDarkBlueStyle(ImGuiStyle* dst)
+{
+	ImGuiStyle &st = ImGui::GetStyle();
+	st.WindowBorderSize = 2.0f;
+	st.WindowPadding = { 4.0f,4.0f };
+	st.ScrollbarSize = 18.0;
+	
+	// st.ScrollbarRounding = 1.0f;
+	// st.FrameBorderSize = 1.0f;
+	// st.FramePadding = ImVec2(4.0f, 2.0f);
+	// st.ItemSpacing = ImVec2(8.0f, 2.0f);
+	// st.WindowBorderSize = 2.0f;
+	// st.TabBorderSize = 1.0f;
+	// st.WindowRounding = 1.0f;
+	// st.ChildRounding = 1.0f;
+	// st.FrameRounding = 1.0f;
+	// st.ScrollbarSize = 18.0;
+	// st.GrabRounding = 1.0f;
+	// st.TabRounding = 1.0f;
+
+	//	st.TabBorderSize = 5.0f;
+	//	st.TabRounding = 2.0f;
+
+
+	// Setup style
+	ImVec4* colors = ImGui::GetStyle().Colors;
+	// main
+	colors[ImGuiCol_FrameBgHovered] = ImVec4(0.219f, 0.431f, 0.568f, 0.68f);
+	colors[ImGuiCol_FrameBgActive] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_TitleBg] = ImVec4(0.219f, 0.431f, 0.568f, 0.65f);
+	colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.219f, 0.431f, 0.568f, 0.35f); 
+	colors[ImGuiCol_TitleBgActive] = ImVec4(0.219f, 0.431f, 0.568f, 0.78f);
+	colors[ImGuiCol_Button] = ImVec4(0.219f, 0.431f, 0.568f, 0.44f);
+	colors[ImGuiCol_ButtonHovered] = ImVec4(0.219f, 0.431f, 0.568f, 0.86f);
+	colors[ImGuiCol_ButtonActive] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_Header] = ImVec4(0.219f, 0.431f, 0.568f, 0.76f);
+	colors[ImGuiCol_HeaderHovered] = ImVec4(0.219f, 0.431f, 0.568f, 0.86f);
+	colors[ImGuiCol_HeaderActive] = ImVec4(0.219f, 0.431f, 0.568f, 0.80f);
+	colors[ImGuiCol_ResizeGrip] = ImVec4(0.219f, 0.431f, 0.568f, 0.20f);
+	colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.219f, 0.431f, 0.568f, 0.78f);
+	colors[ImGuiCol_ResizeGripActive] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_PlotLinesHovered] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_PlotHistogramHovered] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_TextSelectedBg] = ImVec4(0.219f, 0.431f, 0.568f, 0.43f);
+	colors[ImGuiCol_Tab] = ImVec4(0.219f, 0.431f, 0.568f, 0.76f);
+	colors[ImGuiCol_TabHovered] = ImVec4(0.219f, 0.431f, 0.568f, 0.86f);
+	colors[ImGuiCol_TabActive] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_TabUnfocused] = ImVec4(0.219f, 0.431f, 0.568f, 0.76f);
+	colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.219f, 0.431f, 0.568f, 0.86f);
+
+	// area
+	colors[ImGuiCol_FrameBg] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_MenuBarBg] = ImVec4(0.219f, 0.431f, 0.568f, 0.57f);
+	colors[ImGuiCol_ScrollbarBg] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_ScrollbarBg] = ImVec4(0.11f, 0.16f, 0.22f, 1.00f);
+	
+	// background
+	colors[ImGuiCol_WindowBg] = ImVec4(0.11f, 0.16f, 0.22f, 1.00f);
+	colors[ImGuiCol_PopupBg] = ImVec4(0.11f, 0.16f, 0.22f, 0.92f);
+	colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f); //child backgrounnd transparent
+
+	//text
+	colors[ImGuiCol_Text] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+	colors[ImGuiCol_TextDisabled] = ImVec4(1.00f, 1.00f, 1.00f, 0.58f);
+	colors[ImGuiCol_Border] = ImVec4(1.00f, 1.00f, 1.00f, 0.32f);
+	colors[ImGuiCol_PlotHistogram] = ImVec4(1.00f, 1.00f, 1.00f, 0.63f);
+	colors[ImGuiCol_PlotLines] = ImVec4(1.00f, 1.00f, 1.00f, 0.63f);
+	colors[ImGuiCol_CheckMark] = ImVec4(1.00f, 1.00f, 1.00f, 0.80f);
+
+	// scroll & sliders
+	colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.219f, 0.431f, 0.568f, 1.00f);
+	colors[ImGuiCol_SliderGrab] = ImVec4(0.48f, 0.47f, 0.47f, 0.91f);
+	colors[ImGuiCol_SliderGrabActive] = ImVec4(0.56f, 0.55f, 0.55f, 0.62f);
+
+	//fixed colours
+	colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+	colors[ImGuiCol_DockingPreview] = ImVec4(0.38f, 0.48f, 0.60f, 1.00f);
+	colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
+	colors[ImGuiCol_NavHighlight] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
+	colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+	colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 1.00f);
+	colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.0f);
+
+	// not used
+	//colors[ImGuiCol_Separator] = ImVec4(0.58f, 0.58f, 0.58f, 0.50f);
+	//colors[ImGuiCol_SeparatorHovered] = ImVec4(0.81f, 0.81f, 0.81f, 0.64f);
+	//colors[ImGuiCol_SeparatorActive] = ImVec4(0.81f, 0.81f, 0.81f, 0.64f);
+	//colors[ImGuiCol_DragDropTarget] = ImVec4(0.58f, 0.58f, 0.58f, 0.90f);
+	//colors[ImGuiCol_ChildBg] = ImVec4(1.00f, 1.00f, 1.00f, 0.031f);
+}
+
+void CustomStyleColors(ImGuiStyle* dst)
 {
 ImGuiStyle& style = ImGui::GetStyle();
 
 //recall preference values
-static int mainhue = pref.gui_main_hue;
-static int areahue = pref.gui_area_hue;
-static int backhue = pref.gui_back_hue;
-static int texthue = pref.gui_text_hue;
+static float col_main_hue = pref.gui_col_main_hue;
 static float col_main_sat = pref.gui_col_main_sat;
 static float col_main_val = pref.gui_col_main_val;
+static float col_area_hue = pref.gui_col_area_hue;
 static float col_area_sat = pref.gui_col_area_sat;
 static float col_area_val = pref.gui_col_area_val;
+static float col_back_hue = pref.gui_col_back_hue;
 static float col_back_sat = pref.gui_col_back_sat;
 static float col_back_val = pref.gui_col_back_val;
+static float col_text_hue = pref.gui_col_text_hue;
 static float col_text_sat = pref.gui_col_text_sat;
 static float col_text_val = pref.gui_col_text_val;
+static float col_scroll_hue = pref.gui_col_scroll_hue;
+static float col_scroll_sat = pref.gui_col_scroll_sat;
+static float col_scroll_val = pref.gui_col_scroll_val;
 
 //set colours
-ImVec4 col_main = ImColor::HSV(mainhue / 255.f, col_main_sat, col_main_val);
-ImVec4 col_area = ImColor::HSV(areahue / 255.f, col_area_sat, col_area_val);
-ImVec4 col_back = ImColor::HSV(backhue / 255.f, col_back_sat, col_back_val);
-ImVec4 col_text = ImColor::HSV(texthue / 255.f, col_text_sat, col_text_val);
+ImVec4 col_main = ImColor::HSV(col_main_hue, col_main_sat, col_main_val);
+ImVec4 col_area = ImColor::HSV(col_area_hue, col_area_sat, col_area_val);
+ImVec4 col_back = ImColor::HSV(col_back_hue, col_back_sat, col_back_val);
+ImVec4 col_text = ImColor::HSV(col_text_hue, col_text_sat, col_text_val);
+ImVec4 col_scroll = ImColor::HSV(col_scroll_hue, col_scroll_sat, col_scroll_val);
 
 //main 
 style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.68f);
@@ -13368,11 +13847,6 @@ style.Colors[ImGuiCol_FrameBgActive] = ImVec4(col_main.x, col_main.y, col_main.z
 style.Colors[ImGuiCol_TitleBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.65f);
 style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(col_main.x, col_main.y, col_main.z, 0.35f);
 style.Colors[ImGuiCol_TitleBgActive] = ImVec4(col_main.x, col_main.y, col_main.z, 0.78f);
-style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.31f);
-style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.78f);
-style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-style.Colors[ImGuiCol_SliderGrab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.24f);
-style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
 style.Colors[ImGuiCol_Button] = ImVec4(col_main.x, col_main.y, col_main.z, 0.44f);
 style.Colors[ImGuiCol_ButtonHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.86f);
 style.Colors[ImGuiCol_ButtonActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
@@ -13385,7 +13859,6 @@ style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(col_main.x, col_main.y, col_mai
 style.Colors[ImGuiCol_PlotLinesHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
 style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
 style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.43f);
-style.Colors[ImGuiCol_PopupBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.92f);
 style.Colors[ImGuiCol_Tab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.76f);
 style.Colors[ImGuiCol_TabHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.86f);
 style.Colors[ImGuiCol_TabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.0f);
@@ -13396,19 +13869,19 @@ style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(col_main.x, col_main.y, col_m
 style.Colors[ImGuiCol_FrameBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
 style.Colors[ImGuiCol_MenuBarBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.57f);
 style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
-style.Colors[ImGuiCol_ChildWindowBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.00f);
-//style.Colors[ImGuiCol_ComboBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
+style.Colors[ImGuiCol_ChildBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.00f);
 
 //background
 style.Colors[ImGuiCol_WindowBg] = ImVec4(col_back.x, col_back.y, col_back.z, 1.00f);
+style.Colors[ImGuiCol_PopupBg] = ImVec4(col_back.x, col_back.y, col_back.z, 0.92f);
 
 //text
 style.Colors[ImGuiCol_Text] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
 style.Colors[ImGuiCol_TextDisabled] = ImVec4(col_text.x, col_text.y, col_text.z, 0.58f);
 style.Colors[ImGuiCol_Border] = ImVec4(col_text.x, col_text.y, col_text.z, 0.30f);
-style.Colors[ImGuiCol_Column] = ImVec4(col_text.x, col_text.y, col_text.z, 0.32f);
-style.Colors[ImGuiCol_ColumnHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.78f);
-style.Colors[ImGuiCol_ColumnActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
+style.Colors[ImGuiCol_Separator] = ImVec4(col_text.x, col_text.y, col_text.z, 0.32f);
+style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.78f);
+style.Colors[ImGuiCol_SeparatorActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
 style.Colors[ImGuiCol_PlotHistogram] = ImVec4(col_text.x, col_text.y, col_text.z, 0.63f);
 style.Colors[ImGuiCol_PlotLines] = ImVec4(col_text.x, col_text.y, col_text.z, 0.63f);
 style.Colors[ImGuiCol_CheckMark] = ImVec4(col_text.x, col_text.y, col_text.z, 0.80f);
@@ -13416,121 +13889,24 @@ style.Colors[ImGuiCol_CheckMark] = ImVec4(col_text.x, col_text.y, col_text.z, 0.
 //style.Colors[ImGuiCol_CloseButtonHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.39f);
 //style.Colors[ImGuiCol_CloseButtonActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
 
+//scroll & sliders
+style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 0.50f); //0.31
+style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 0.78f);
+style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 1.00f);
+style.Colors[ImGuiCol_SliderGrab] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 0.50f); //0.24
+style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(col_scroll.x, col_scroll.y, col_scroll.z, 1.00f);
+
 //fixed colours
 style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
+//style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
 style.Colors[ImGuiCol_DockingPreview] = ImVec4(0.38f, 0.48f, 0.60f, 1.00f);
 style.Colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
 style.Colors[ImGuiCol_NavHighlight] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
 style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 1.0f);
 style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
-style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.6f);
+style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.0f);
 
 }
-
-
-/*
-void SetupStyleFromHue()
-{
-#if 1
-	// FIXME: those should become parameters to the function
-	static int hue = 140;
-	static float col_main_sat = 180.f / 255.f;
-	static float col_main_val = 161.f / 255.f;
-	static float col_area_sat = 124.f / 255.f;
-	static float col_area_val = 100.f / 255.f;
-	static float col_back_sat = 59.f / 255.f;
-	static float col_back_val = 40.f / 255.f;
-
-	ImGui::Begin("Hue Style");
-	ImGui::SliderInt("master hue", &hue, 0, 255);
-
-	float dummy;
-	ImVec4 rgb;
-//	ImGui::ColorEditMode(ImGuiColorEditMode_HSV);
-
-	ImGui::ColorConvertHSVtoRGB(hue / 255.f, col_main_sat, col_main_val, rgb.x, rgb.y, rgb.z);
-	ImGui::ColorEdit3("main", &rgb.x);
-	ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, dummy, col_main_sat, col_main_val);
-
-	ImGui::ColorConvertHSVtoRGB(hue / 255.f, col_area_sat, col_area_val, rgb.x, rgb.y, rgb.z);
-	ImGui::ColorEdit3("area", &rgb.x);
-	ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, dummy, col_area_sat, col_area_val);
-
-	ImGui::ColorConvertHSVtoRGB(hue / 255.f, col_back_sat, col_back_val, rgb.x, rgb.y, rgb.z);
-	ImGui::ColorEdit3("back", &rgb.x);
-	ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, dummy, col_back_sat, col_back_val);
-
-	ImGui::End();
-#endif
-
-	ImGuiStyle& style = ImGui::GetStyle();
-
-	ImVec4 col_text = ImColor::HSV(hue / 255.f, 20.f / 255.f, 235.f / 255.f);
-	ImVec4 col_main = ImColor::HSV(hue / 255.f, col_main_sat, col_main_val);
-	ImVec4 col_back = ImColor::HSV(hue / 255.f, col_back_sat, col_back_val);
-	ImVec4 col_area = ImColor::HSV(hue / 255.f, col_area_sat, col_area_val);
-
-	style.Colors[ImGuiCol_Text] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
-	style.Colors[ImGuiCol_TextDisabled] = ImVec4(col_text.x, col_text.y, col_text.z, 0.58f);
-	style.Colors[ImGuiCol_WindowBg] = ImVec4(col_back.x, col_back.y, col_back.z, 1.00f);
-	style.Colors[ImGuiCol_ChildWindowBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.00f);
-	style.Colors[ImGuiCol_Border] = ImVec4(col_text.x, col_text.y, col_text.z, 0.30f);
-	style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-	style.Colors[ImGuiCol_FrameBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
-	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.68f);
-	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	style.Colors[ImGuiCol_TitleBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.45f);
-	style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(col_main.x, col_main.y, col_main.z, 0.35f);
-	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(col_main.x, col_main.y, col_main.z, 0.78f);
-	style.Colors[ImGuiCol_MenuBarBg] = ImVec4(col_area.x, col_area.y, col_area.z, 0.57f);
-	style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
-	style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.31f);
-	style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.78f);
-	style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	//style.Colors[ImGuiCol_ComboBg] = ImVec4(col_area.x, col_area.y, col_area.z, 1.00f);
-	style.Colors[ImGuiCol_CheckMark] = ImVec4(col_main.x, col_main.y, col_main.z, 0.80f);
-	style.Colors[ImGuiCol_SliderGrab] = ImVec4(col_main.x, col_main.y, col_main.z, 0.24f);
-	style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	style.Colors[ImGuiCol_Button] = ImVec4(col_main.x, col_main.y, col_main.z, 0.44f);
-	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.86f);
-	style.Colors[ImGuiCol_ButtonActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	style.Colors[ImGuiCol_Header] = ImVec4(col_main.x, col_main.y, col_main.z, 0.76f);
-	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.86f);
-	style.Colors[ImGuiCol_HeaderActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	style.Colors[ImGuiCol_Column] = ImVec4(col_text.x, col_text.y, col_text.z, 0.32f);
-	style.Colors[ImGuiCol_ColumnHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.78f);
-	style.Colors[ImGuiCol_ColumnActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
-	style.Colors[ImGuiCol_ResizeGrip] = ImVec4(col_main.x, col_main.y, col_main.z, 0.20f);
-	style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 0.78f);
-	style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	//style.Colors[ImGuiCol_CloseButton] = ImVec4(col_text.x, col_text.y, col_text.z, 0.16f);
-	//style.Colors[ImGuiCol_CloseButtonHovered] = ImVec4(col_text.x, col_text.y, col_text.z, 0.39f);
-	//style.Colors[ImGuiCol_CloseButtonActive] = ImVec4(col_text.x, col_text.y, col_text.z, 1.00f);
-	style.Colors[ImGuiCol_PlotLines] = ImVec4(col_text.x, col_text.y, col_text.z, 0.63f);
-	style.Colors[ImGuiCol_PlotLinesHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	style.Colors[ImGuiCol_PlotHistogram] = ImVec4(col_text.x, col_text.y, col_text.z, 0.63f);
-	style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(col_main.x, col_main.y, col_main.z, 1.00f);
-	style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.43f);
-	//style.Colors[ImGuiCol_TooltipBg] = ImVec4(col_main.x, col_main.y, col_main.z, 0.92f);
-	style.Colors[ImGuiCol_ModalWindowDarkening] = ImVec4(0.20f, 0.20f, 0.20f, 0.35f);
-
-
-	style.Colors[ImGuiCol_Tab] = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
-	style.Colors[ImGuiCol_TabHovered] = ImVec4(0.29f, 0.29f, 0.29f, 1.00f);
-	style.Colors[ImGuiCol_TabActive] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
-	style.Colors[ImGuiCol_TabUnfocused] = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
-	style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
-	style.Colors[ImGuiCol_DockingPreview] = ImVec4(0.38f, 0.48f, 0.60f, 1.00f);
-	style.Colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
-	style.Colors[ImGuiCol_NavHighlight] = ImVec4(0.60f, 0.60f, 0.60f, 1.00f);
-	style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 1.0f);
-	style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 1.0f);
-	style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.6f);
-
-
-}
-*/
 
 //###################
 //#### Debug log ####
@@ -14067,7 +14443,7 @@ void processDebugger(void)
 										ImGui::InputText(tmp, &cEditingStringValue[0], MAX_PATH - 60, 0); //ImGuiInputTextFlags_EnterReturnsTrue
 									}
 									else if (iEditingType == 2) {
-										if (ImGui::InputFloat(tmp, &fEditingFloat, 0.01, 0.10, 6, 0)) { //ImGuiInputTextFlags_EnterReturnsTrue
+										if (ImGui::InputFloat(tmp, &fEditingFloat, 0.01f, 0.10f, "%.6f", 0)) { //ImGuiInputTextFlags_EnterReturnsTrue
 											bQuickChange = true;
 										}
 									}
@@ -14226,7 +14602,7 @@ void processDebugger(void)
 						ImGui::InputText(tmp, &cEditingStringValue[0], MAX_PATH-60, 0); //ImGuiInputTextFlags_EnterReturnsTrue
 					}
 					else if (iEditingType == 2) {
-						if (ImGui::InputFloat(tmp, &fEditingFloat, 0.01, 0.1, 6, 0)) { //ImGuiInputTextFlags_EnterReturnsTrue
+						if (ImGui::InputFloat(tmp, &fEditingFloat, 0.01f, 0.1f, "%.6f", 0)) { //ImGuiInputTextFlags_EnterReturnsTrue
 							bQuickChange = true;
 						}
 					}
@@ -15364,11 +15740,7 @@ const char *noc_file_dialog_open(int flags,
 		agk::KeyUp(18); // reset alt key.
 		agk::KeyUp(19); // reset pause key.
 
-		io.KeysDown[13] = false; //also reset imgui keys.
-		io.KeysDown[16] = false;
-		io.KeysDown[17] = false;
-		io.KeysDown[18] = false;
-		io.KeysDown[19] = false;
+	// ImGui 1.90+: KeysDown[] is deprecated; rely on AGK KeyUp + event API
 
 		return strdup(szFile);
 	}
@@ -15410,11 +15782,7 @@ const char *noc_file_dialog_open(int flags,
 	agk::KeyUp(18); // reset alt key.
 	agk::KeyUp(19); // reset pause key.
 
-	io.KeysDown[13] = false; //also reset imgui keys.
-	io.KeysDown[16] = false;
-	io.KeysDown[17] = false;
-	io.KeysDown[18] = false;
-	io.KeysDown[19] = false;
+	// ImGui 1.90+: KeysDown[] is deprecated; rely on AGK KeyUp + event API
 
 	if(g_noc_file_dialog_ret != NULL)
 		free(g_noc_file_dialog_ret);
@@ -15671,20 +16039,13 @@ bool CancelQuit()
 		selection = boxer::show("Are you sure you want to quit ?", " Warning!", boxer::Style::Question, boxer::Buttons::OKCancel);
 
 		//Make sure ther blocking dialog did not skip some keys, reset.
-		ImGuiIO& io = ImGui::GetIO();
-		io.KeySuper = false;
-		io.KeyCtrl = false;
-		io.KeyAlt = false;
-		io.KeyShift = false;
+	ImGuiIO& io = ImGui::GetIO();
 		agk::KeyUp(13); // reset enter key
 		agk::KeyUp(16); // reset shift key.
 		agk::KeyUp(17); // reset ctrl key.
 		agk::KeyUp(18); // reset alt key.
 		agk::KeyUp(19); // reset pause key.
-		io.KeysDown[13] = false;
-		io.KeysDown[17] = false;
-		io.KeysDown[18] = false;
-		io.KeysDown[19] = false;
+	// ImGui 1.90+: KeysDown[] and direct Key* fields are deprecated here
 
 		if (selection == boxer::Selection::Cancel) {
 			return true;
@@ -15700,20 +16061,12 @@ bool overWriteFileBox(char * file)
 
 	//Make sure ther blocking dialog did not skip some keys, reset.
 	ImGuiIO& io = ImGui::GetIO();
-	io.KeySuper = false;
-	io.KeyCtrl = false;
-	io.KeyAlt = false;
-	io.KeyShift = false;
 	agk::KeyUp(13); // reset enter key.
 	agk::KeyUp(16); // reset shift key.
 	agk::KeyUp(17); // reset ctrl key.
 	agk::KeyUp(18); // reset alt key.
 	agk::KeyUp(19); // reset pause key.
-	io.KeysDown[13] = false;
-	io.KeysDown[16] = false;
-	io.KeysDown[17] = false;
-	io.KeysDown[18] = false;
-	io.KeysDown[19] = false;
+	// ImGui 1.90+: KeysDown[] and direct Key* fields are deprecated here
 
 	if (selection == boxer::Selection::Yes) return(true);
 
@@ -15726,21 +16079,12 @@ bool askBox(char * ask , char *title)
 
 	//Make sure ther blocking dialog did not skip some keys, reset.
 	ImGuiIO& io = ImGui::GetIO();
-	io.KeySuper = false;
-	io.KeyCtrl = false;
-	io.KeyAlt = false;
-	io.KeyShift = false;
 	agk::KeyUp(13); // reset enter key
 	agk::KeyUp(16); // reset shift key.
 	agk::KeyUp(17); // reset ctrl key.
 	agk::KeyUp(18); // reset alt key.
 	agk::KeyUp(19); // reset pause key.
-
-	io.KeysDown[13] = false; //also reset imgui keys.
-	io.KeysDown[16] = false;
-	io.KeysDown[17] = false;
-	io.KeysDown[18] = false;
-	io.KeysDown[19] = false;
+	// ImGui 1.90+: KeysDown[] and direct Key* fields are deprecated here
 
 	if (selection == boxer::Selection::Yes) return(true);
 
@@ -15758,21 +16102,12 @@ bool changedFileBox(char * file)
 
 	//Make sure ther blocking dialog did not skip some keys, reset.
 	ImGuiIO& io = ImGui::GetIO();
-	io.KeySuper = false;
-	io.KeyCtrl = false;
-	io.KeyAlt = false;
-	io.KeyShift = false;
 	agk::KeyUp(13); // reset enter key
 	agk::KeyUp(16); // reset shift key.
 	agk::KeyUp(17); // reset ctrl key.
 	agk::KeyUp(18); // reset alt key.
 	agk::KeyUp(19); // reset pause key.
-
-	io.KeysDown[13] = false;
-	io.KeysDown[16] = false;
-	io.KeysDown[17] = false;
-	io.KeysDown[18] = false;
-	io.KeysDown[19] = false;
+	// ImGui 1.90+: KeysDown[] and direct Key* fields are deprecated here
 
 	if (selection == boxer::Selection::Yes) return(true);
 
@@ -15794,11 +16129,7 @@ void BoxerInfo(char * text,const char *heading)
 	agk::KeyUp(18); // reset alt key.
 	agk::KeyUp(19); // reset pause key.
 
-	io.KeysDown[13] = false;
-	io.KeysDown[16] = false;
-	io.KeysDown[17] = false;
-	io.KeysDown[18] = false;
-	io.KeysDown[19] = false;
+	// KeysDown[] removed in 1.90+: backend now feeds events. Avoid forcing key state here.
 
 }
 

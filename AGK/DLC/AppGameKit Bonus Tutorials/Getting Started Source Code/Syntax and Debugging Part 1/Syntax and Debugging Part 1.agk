@@ -1,0 +1,13 @@
+
+[projectfiles]
+FILE_0=main.agc;-1
+[files]
+FILE_NAME_0=1;main.agc;1;0
+[project]
+description=
+
+[watchvariables]
+watch_variable=@Version;
+watch_variable=PlayerX;
+watch_variable=PlayerY;
+

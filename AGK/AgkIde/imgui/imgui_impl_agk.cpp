@@ -8,6 +8,7 @@
 #include "imgui\imgui.h"
 #include "imgui\imgui_draw.cpp"
 #include "imgui\imgui_widgets.cpp"
+#include "imgui\\imgui_tables.cpp"
 #include "imgui\imconfig.h"
 #include "imgui\imgui.cpp"
 #include "imgui\imgui_impl_agk.h"
@@ -19,6 +20,11 @@
 #include <tchar.h>
 #include <gl\gl.h>
 #include <gl\glu.h>
+#include "agk.h"
+
+#ifndef GL_CLAMP_TO_EDGE
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
 
 // Win32 Data
 bool					g_WantUpdateMonitors = true;
@@ -53,28 +59,7 @@ bool    ImGui_ImplAGK_Init(void* hwnd)
 //    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 //        ImGui_ImplWin32_InitPlatformInterface();
 
-    // Keyboard mapping. ImGui will use those indices to peek into the io.KeysDown[] array that we will update during the application lifetime.
-    io.KeyMap[ImGuiKey_Tab] = VK_TAB;
-    io.KeyMap[ImGuiKey_LeftArrow] = VK_LEFT;
-    io.KeyMap[ImGuiKey_RightArrow] = VK_RIGHT;
-    io.KeyMap[ImGuiKey_UpArrow] = VK_UP;
-    io.KeyMap[ImGuiKey_DownArrow] = VK_DOWN;
-    io.KeyMap[ImGuiKey_PageUp] = VK_PRIOR;
-    io.KeyMap[ImGuiKey_PageDown] = VK_NEXT;
-    io.KeyMap[ImGuiKey_Home] = VK_HOME;
-    io.KeyMap[ImGuiKey_End] = VK_END;
-    io.KeyMap[ImGuiKey_Insert] = VK_INSERT;
-    io.KeyMap[ImGuiKey_Delete] = VK_DELETE;
-    io.KeyMap[ImGuiKey_Backspace] = VK_BACK;
-    io.KeyMap[ImGuiKey_Space] = VK_SPACE;
-    io.KeyMap[ImGuiKey_Enter] = VK_RETURN;
-    io.KeyMap[ImGuiKey_Escape] = VK_ESCAPE;
-    io.KeyMap[ImGuiKey_A] = 'A';
-    io.KeyMap[ImGuiKey_C] = 'C';
-    io.KeyMap[ImGuiKey_V] = 'V';
-    io.KeyMap[ImGuiKey_X] = 'X';
-    io.KeyMap[ImGuiKey_Y] = 'Y';
-    io.KeyMap[ImGuiKey_Z] = 'Z';
+	// ImGui 1.90+: no KeyMap/KeysDown. Keys are provided via AddKeyEvent() in NewFrame.
 
     return true;
 }
@@ -129,8 +114,8 @@ static void ImGui_ImplAGL_UpdateMousePos()
 		agk::SetRawMousePosition(pos.x, pos.y);
     }
 
-    // Set mouse position
-    io.MousePos = ImVec2((float)agk::GetPointerX(), (float)agk::GetPointerX());
+	// Set mouse position (event-based in 1.90+)
+	io.AddMousePosEvent((float)agk::GetPointerX(), (float)agk::GetPointerY());
 }
 
 //PE: imGUI needs Unicode for input, so convert char to unicode.
@@ -202,11 +187,11 @@ void    ImGui_ImplAGL_NewFrame()
 
 //PAUL rem	io.DeltaTime = agk::GetFrameTime(); //PE: Deltatime same as AGK frame time.
 
-	// Read keyboard modifiers inputs
-	io.KeyCtrl = agk::GetRawKeyState(VK_CONTROL); //VK_CONTROL same as in AGK.
-	io.KeyShift = agk::GetRawKeyState(VK_SHIFT);
-	io.KeyAlt = agk::GetRawKeyState(VK_MENU);
-	io.KeySuper = false;
+	// Read keyboard modifiers inputs (event API)
+	io.AddKeyEvent(ImGuiKey_ModCtrl,  agk::GetRawKeyState(VK_CONTROL) != 0);
+	io.AddKeyEvent(ImGuiKey_ModShift, agk::GetRawKeyState(VK_SHIFT)   != 0);
+	io.AddKeyEvent(ImGuiKey_ModAlt,   agk::GetRawKeyState(VK_MENU)    != 0);
+	io.AddKeyEvent(ImGuiKey_ModSuper, (agk::GetRawKeyState(VK_LWIN) != 0) || (agk::GetRawKeyState(VK_RWIN) != 0));
 
     // Update OS mouse position
     ImGui_ImplAGL_UpdateMousePos();
@@ -220,35 +205,96 @@ void    ImGui_ImplAGL_NewFrame()
 	}
 	//agk::Print(g_LastMouseCursor);
 
-	//PE: Other input.
-//	if (agk::GetPointerPressed()) {
-	if (agk::GetPointerState()) {
-		io.MouseDown[0] = true;
-	}
-	if (agk::GetRawMouseRightPressed()) {
-		io.MouseDown[1] = true;
-	}
-	if (agk::GetRawMouseMiddlePressed()) {
-		io.MouseDown[2] = true;
-	}
-	if (agk::GetPointerReleased()) {
-		io.MouseDown[0] = false;
-	}
-	if (agk::GetRawMouseRightReleased()) {
-		io.MouseDown[1] = false;
-	}
-	if (agk::GetRawMouseMiddleReleased()) {
-		io.MouseDown[2] = false;
-	}
+	// Mouse buttons and wheel
+	// Left
+	if (agk::GetPointerPressed())  io.AddMouseButtonEvent(0, true);
+	if (agk::GetPointerReleased()) io.AddMouseButtonEvent(0, false);
+	// Right
+	if (agk::GetRawMouseRightPressed())  io.AddMouseButtonEvent(1, true);
+	if (agk::GetRawMouseRightReleased()) io.AddMouseButtonEvent(1, false);
+	// Middle
+	if (agk::GetRawMouseMiddlePressed())  io.AddMouseButtonEvent(2, true);
+	if (agk::GetRawMouseMiddleReleased()) io.AddMouseButtonEvent(2, false);
 
-	io.MouseWheel += agk::GetRawMouseWheelDelta() * 0.20; // GetRawMouseWheelDelta to fast so *0.2
+	float wheel = (float)agk::GetRawMouseWheelDelta() * 0.20f; // AGK delta too fast, scale down
+	if (wheel != 0.0f)
+		io.AddMouseWheelEvent(0.0f, wheel);
 
-	for (int a = 0; a < 255; a++) {
-		io.KeysDown[a] = agk::GetRawKeyState(a);
-		if (a == 9 && agk::GetRawKeyPressed(a) ) {
-			io.AddInputCharacter((unsigned short) 9 );	//Add tab to char input.
+	// Keyboard: provide key states via AddKeyEvent. Map a set of commonly used VK_ codes to ImGuiKey.
+	auto VkToImGuiKey = [](int vk) -> ImGuiKey
+	{
+		switch (vk)
+		{
+		case VK_TAB: return ImGuiKey_Tab;
+		case VK_LEFT: return ImGuiKey_LeftArrow;
+		case VK_RIGHT: return ImGuiKey_RightArrow;
+		case VK_UP: return ImGuiKey_UpArrow;
+		case VK_DOWN: return ImGuiKey_DownArrow;
+		case VK_PRIOR: return ImGuiKey_PageUp;
+		case VK_NEXT: return ImGuiKey_PageDown;
+		case VK_HOME: return ImGuiKey_Home;
+		case VK_END: return ImGuiKey_End;
+		case VK_INSERT: return ImGuiKey_Insert;
+		case VK_DELETE: return ImGuiKey_Delete;
+		case VK_BACK: return ImGuiKey_Backspace;
+		case VK_SPACE: return ImGuiKey_Space;
+		case VK_RETURN: return ImGuiKey_Enter;
+		case VK_ESCAPE: return ImGuiKey_Escape;
+		case '0': return ImGuiKey_0; case '1': return ImGuiKey_1; case '2': return ImGuiKey_2; case '3': return ImGuiKey_3; case '4': return ImGuiKey_4;
+		case '5': return ImGuiKey_5; case '6': return ImGuiKey_6; case '7': return ImGuiKey_7; case '8': return ImGuiKey_8; case '9': return ImGuiKey_9;
+		case 'A': return ImGuiKey_A; case 'B': return ImGuiKey_B; case 'C': return ImGuiKey_C; case 'D': return ImGuiKey_D; case 'E': return ImGuiKey_E;
+		case 'F': return ImGuiKey_F; case 'G': return ImGuiKey_G; case 'H': return ImGuiKey_H; case 'I': return ImGuiKey_I; case 'J': return ImGuiKey_J;
+		case 'K': return ImGuiKey_K; case 'L': return ImGuiKey_L; case 'M': return ImGuiKey_M; case 'N': return ImGuiKey_N; case 'O': return ImGuiKey_O;
+		case 'P': return ImGuiKey_P; case 'Q': return ImGuiKey_Q; case 'R': return ImGuiKey_R; case 'S': return ImGuiKey_S; case 'T': return ImGuiKey_T;
+		case 'U': return ImGuiKey_U; case 'V': return ImGuiKey_V; case 'W': return ImGuiKey_W; case 'X': return ImGuiKey_X; case 'Y': return ImGuiKey_Y; case 'Z': return ImGuiKey_Z;
+		case VK_F1: return ImGuiKey_F1; case VK_F2: return ImGuiKey_F2; case VK_F3: return ImGuiKey_F3; case VK_F4: return ImGuiKey_F4; case VK_F5: return ImGuiKey_F5;
+		case VK_F6: return ImGuiKey_F6; case VK_F7: return ImGuiKey_F7; case VK_F8: return ImGuiKey_F8; case VK_F9: return ImGuiKey_F9; case VK_F10: return ImGuiKey_F10;
+		case VK_F11: return ImGuiKey_F11; case VK_F12: return ImGuiKey_F12;
+		case VK_OEM_PLUS: return ImGuiKey_Equal; // '+' '='
+		case VK_OEM_MINUS: return ImGuiKey_Minus;
+		case VK_OEM_COMMA: return ImGuiKey_Comma;
+		case VK_OEM_PERIOD: return ImGuiKey_Period;
+		case VK_OEM_2: return ImGuiKey_Slash;
+		case VK_OEM_1: return ImGuiKey_Semicolon;
+		case VK_OEM_7: return ImGuiKey_Apostrophe;
+		case VK_OEM_4: return ImGuiKey_LeftBracket;
+		case VK_OEM_6: return ImGuiKey_RightBracket;
+		case VK_OEM_5: return ImGuiKey_Backslash;
+		case VK_OEM_3: return ImGuiKey_GraveAccent;
+		default: return ImGuiKey_None;
 		}
-	}
+	};
+
+	auto AddKeyFromVK = [&](int vk)
+	{
+		ImGuiKey key = VkToImGuiKey(vk);
+		if (key != ImGuiKey_None)
+			io.AddKeyEvent(key, agk::GetRawKeyState(vk) != 0);
+	};
+
+	// Core navigation keys
+	AddKeyFromVK(VK_TAB);
+	AddKeyFromVK(VK_LEFT); AddKeyFromVK(VK_RIGHT); AddKeyFromVK(VK_UP); AddKeyFromVK(VK_DOWN);
+	AddKeyFromVK(VK_PRIOR); AddKeyFromVK(VK_NEXT); AddKeyFromVK(VK_HOME); AddKeyFromVK(VK_END);
+	AddKeyFromVK(VK_INSERT); AddKeyFromVK(VK_DELETE);
+	AddKeyFromVK(VK_BACK); AddKeyFromVK(VK_SPACE); AddKeyFromVK(VK_RETURN); AddKeyFromVK(VK_ESCAPE);
+
+	// Letters and numbers
+	for (int c = '0'; c <= '9'; ++c) AddKeyFromVK(c);
+	for (int c = 'A'; c <= 'Z'; ++c) AddKeyFromVK(c);
+
+	// Function keys
+	AddKeyFromVK(VK_F1); AddKeyFromVK(VK_F2); AddKeyFromVK(VK_F3); AddKeyFromVK(VK_F4); AddKeyFromVK(VK_F5);
+	AddKeyFromVK(VK_F6); AddKeyFromVK(VK_F7); AddKeyFromVK(VK_F8); AddKeyFromVK(VK_F9); AddKeyFromVK(VK_F10);
+	AddKeyFromVK(VK_F11); AddKeyFromVK(VK_F12);
+
+	// OEM punctuation
+	AddKeyFromVK(VK_OEM_PLUS); AddKeyFromVK(VK_OEM_MINUS); AddKeyFromVK(VK_OEM_COMMA); AddKeyFromVK(VK_OEM_PERIOD);
+	AddKeyFromVK(VK_OEM_2); AddKeyFromVK(VK_OEM_1); AddKeyFromVK(VK_OEM_7); AddKeyFromVK(VK_OEM_4); AddKeyFromVK(VK_OEM_6); AddKeyFromVK(VK_OEM_5); AddKeyFromVK(VK_OEM_3);
+
+	// Legacy io.KeysDown[] mirroring removed in 1.92. Use AddKeyEvent() and IsKeyDown() in app code.
+	if (agk::GetRawKeyPressed(VK_TAB))
+		io.AddInputCharacter((unsigned short)9);
 
 	//PE: AGK GetCharBuffer same as WM_CHAR just converted to char , so convert back to unicode.
 //	if (agk::GetCharBufferLength() > 0) {
@@ -268,6 +314,7 @@ void    ImGui_ImplAGL_NewFrame()
 		for (int a = 0; a < wcslen(wstring); a++) {
 			io.AddInputCharacter((unsigned short)wstring[a]);
 		}
+		delete [] wstring;
 		delete mys;
 	}
 
@@ -395,7 +442,7 @@ void ImGui_ImplAGK_RenderDrawData(ImDrawData* draw_data)
 					//pShader->DrawIndices( (GLsizei)pcmd->ElemCount , (unsigned short *) idx_buffer , GL_TRIANGLES );
 
 					// Bind textures
-					GLuint useTexture = (GLuint)(intptr_t)pcmd->TextureId;
+					GLuint useTexture = (GLuint)(intptr_t)pcmd->GetTexID();
 
 
 
@@ -491,8 +538,8 @@ bool ImGui_ImplOpenGL2_CreateFontsTexture()
 	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
-	// Store our identifier
-	io.Fonts->TexID = (ImTextureID)(intptr_t)g_FontTexture;
+	// Store our identifier (legacy path still supported)
+	io.Fonts->SetTexID((ImTextureID)(intptr_t)g_FontTexture);
 
 	// Restore state
 	glBindTexture(GL_TEXTURE_2D, last_texture);
@@ -505,8 +552,8 @@ void ImGui_ImplOpenGL2_DestroyFontsTexture()
 	if (g_FontTexture)
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		glDeleteTextures(1, &g_FontTexture);
-		io.Fonts->TexID = 0;
+	glDeleteTextures(1, &g_FontTexture);
+	io.Fonts->SetTexID((ImTextureID)0);
 		g_FontTexture = 0;
 	}
 }

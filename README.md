@@ -1,5 +1,5 @@
 # AGK Repository
-New Home of AGK Source Code for 2024 and Beyond.
+New Home of AGK Source Code for 2025 and Beyond.
 
 ## WINDOWS PC INSTRUCTIONS
 The following instructions require Windows 10 or above:
@@ -7,22 +7,22 @@ The following instructions require Windows 10 or above:
 ## Pre-requisites to compile AGK Studio
 Ensure the following are installed with particular attention to the versions:
 - Install Visual Studio 2022
-- Android Studio (android-studio-2023.2.1.25-windows.exe) 
-- Android SDK 34
-- Android 14.0 platform
+- Android Studio (android-studio-2025.1.3.7-windows.exe) 
+- Android SDK 35
+- Android 15.0 platform
 - Install Java JDK 17
 - Install GitHub Desktop
 - Install Git Large File Storage (https://docs.github.com/en/repositories/working-with-files/managing-large-files/configuring-git-large-file-storage)
 
 ## Notes on project settings
-New APKs submitted to the Google Store require API 33 (Android 13) since August 2023: https://developer.android.com/google/play/requirements/target-sdk
-Small changes to any pre-API 33 projects include:
+New APKs submitted to the Google Store require API 35 (Android 15) from August 2025: https://developer.android.com/google/play/requirements/target-sdk
+Small changes to any pre-API 35 projects include:
 - Add namespace 'com.thegamecreators.agk_player2' in "AGKPlayer2\build.gradle"
 - Add mavenCentral() in "build.gradle"
 - Remove jcenter() in "build.gradle"
-- Update version classpath 'com.android.tools.build:gradle:8.1.1' // was 7.2.1
-- Update version compileSdkVersion 34 in "AGKPlayer2\build.gradle"
+- Update version classpath 'com.android.tools.build:gradle:8.14'
 - Ensure that any Android Studio project points to JDK 17 (via "Settings>Build,Exe&Dep>Build Tools>Gradle>GradleJDK")
+- Update InAppPurchase.java to comply with Google Billing 7.1.1
 
 ## Sequence to build AGK Studio
 You need to open in Android Studio and build these projects once before attempting to compile AGK:
@@ -31,7 +31,7 @@ You need to open in Android Studio and build these projects once before attempti
 - \AGK\apps\interpreter_android_ouya 
 
 ## Setup all environment variables
-- Add Environment Variable called NDK_PATH with absolute path to "D:\DEV\AGKREPO\AGK_Build\External\android-ndk-r20b"
+- Add Environment Variable called NDK_PATH with absolute path to "D:\DEV\AGKREPO\AGK_Build\External\android-ndk-r28c"
 - Add Environment Variable called USERNAMEFORAGK with the folder truncation of your Username (so would be 'fred' as might appear in "C:\Users\fred\Documents\"). Do not use your full username or include any path text, just the folder name that appears in the example given.
 - Add Environment Variable called VULKAN_SDK_PATH with absolute path to "D:\DEV\AGKREPO\AGK_Build\External"
 - Add Environment Variable called AGK_STUDIO_PATH with absolute path to "D:\DEV\AGKREPO\AGK"
@@ -59,7 +59,7 @@ The following instructions require a modern Mac or Mac-Mini:
 
 ## Pre-requisites to compile the Apple binaries
 Ensure the following are installed:
-- XCODE 15.2 or above
+- XCODE 16 (using SDK 18)
 - Install GitHub Desktop for Mac-Mini
 - Select YES to any prompt asking to initialize Git Large File Storage
 
@@ -79,8 +79,25 @@ Ensure the following are installed:
 - You will need an Apple Developer Account to create your certificates and provisions to replace those used by TGC (Apple website has instructions)
 - The AGK IDE for the Mac uses an older AGK Lib file that has been provided and hard copied to the repo for predictable compiling
 
+## Final iOS Export Files
+- If XCode or MacOS have been updated then the following needs to be done. It is good practice to always check just in case something updated without you realising.
+- The build process will have output the iOS Player in the AGKPlayeriOS folder on your desktop. Rename the “AppGameKit Player.ipa” file to .zip and extract it, then rename it back to .ipa.
+- Inside the extracted zip folder go into the Payload folder and right click Show Contents on the AppGameKit Player.app file. In here open the Info.plist file in XCode. It will be in a binary format so only XCode can show you the contents.
+- This file contains some values that we need to copy into our iOS export plist file so that Apple will accept it.
+- In the AGK main repo folder find the “AgkIde/media/data/ios/source/AppGameKit Player.app” file. Right click it and Show Contents, then open the Info.plist file in that folder. Set it up so that both Info.plist files are visible side by side, remembering which one is which.
+- Annoyingly the fields are in different orders in both files, but you are looking for fields with cryptic looking values like “22C65” or “1420” which might make them easier to spot. The full list of fields that need to be copied from the IPA version to the AgkIde version are:
+○ BuildMachineOSBuild
+○ DTPlatformBuild
+○ DTPlatformVersion
+○ DTSDKBuild
+○ DTSDKName
+○ DTXcode
+○ DTXcodeBuild
+- If any of those fields are copied incorrectly then Apple will reject any IPA exported from the Studio IDE.
+- Once the Info.plist file has been modified, save it, close both and the copy the AgkIde version into the build folder, for example mine would be copied to “/Users/myname/AGKStudioBuild/AppGameKitStudio/AppGameKitStudio.app/Contents/Resources/media/data/ios/source/AppGameKit Player.app/Info.plist”. Only copy the plist file, do not overwrite the entire .app folder
+
 ## LINUX INSTRUCTIONS
-The Linux source code is not supported in the AGKREPO at this time. * Linux version of AGK Studio downloaded from Steam, Tier 2 Android contains a bat file to start compiling C++ code, instead of an sh script.
+The Linux source code is not supported in the AGKREPO at this time.
 
 ## How to Implement Tracking Transparency 
 App tracking transparency was implemented a few years ago using the external command functionality. Here's how to use it:

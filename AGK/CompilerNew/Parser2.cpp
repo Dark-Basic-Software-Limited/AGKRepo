@@ -8664,13 +8664,7 @@ int Parser2::FirstPass( cProgramData *pProgram, int replaceConstants )
 				// skip constant declarations
 				while ( pProgram->GetToken( t )->iType != AGK_TOKEN_EOL && t < pProgram->m_iNumTokens )
 				{
-					pNewTokens[ newPtr++ ] = pProgram->GetToken( t++ );
-				}
-
-				// copy end of line
-				if (t < pProgram->m_iNumTokens)
-				{
-					pNewTokens[ newPtr++ ] = pProgram->GetToken( t );
+					t++;
 				}
 			}
 			else
